@@ -9,17 +9,17 @@
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #F7F5F0;
-    --card: #FFFFFF;
-    --ink: #2B2A28;
-    --ink-soft: #6E6B64;
-    --accent: #3A5A78;
-    --accent-soft: #DCE6EE;
-    --gold: #C99A3B;
-    --gold-soft: #F6ECD6;
-    --border: #E4E0D8;
-    --red: #B5564A;
-    --red-soft: #F5E4E1;
+    --bg: #0D1117;
+    --card: #161B22;
+    --ink: #E6EDF3;
+    --ink-soft: #8B949E;
+    --accent: #7DD3A8;
+    --accent-soft: #1B3A2C;
+    --gold: #E3B341;
+    --gold-soft: #3A2F0F;
+    --border: #30363D;
+    --red: #F47067;
+    --red-soft: #3D1F1C;
   }
 
   * { box-sizing: border-box; }
@@ -28,11 +28,11 @@
     margin: 0;
     background: var(--bg);
     color: var(--ink);
-    font-family: 'Inter', sans-serif;
+    font-family: 'JetBrains Mono', monospace;
     min-height: 100vh;
     display: flex;
     justify-content: center;
-    padding: 3rem 1.25rem;
+    padding: 2rem 1rem;
   }
 
   main {
@@ -169,7 +169,7 @@
   }
 
   .face.back .word {
-    font-family: 'Inter', sans-serif;
+    font-family: 'JetBrains Mono', monospace;
     font-weight: 600;
   }
 
@@ -179,6 +179,7 @@
     border-radius: 14px;
     min-height: 180px;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
     text-align: center;
@@ -187,12 +188,28 @@
     padding: 1.5rem;
   }
 
+  #practiceAgainBtn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    font-weight: 700;
+    background: var(--accent);
+    color: #04342C;
+    border: none;
+    border-radius: 8px;
+    padding: 0.6rem 1.1rem;
+    cursor: pointer;
+  }
+
+  #practiceAgainBtn:hover {
+    background: #9FE1CB;
+  }
+
   .grade-row {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 8px;
     margin-bottom: 2rem;
-    height: 42px;
+    height: 44px;
   }
 
   .grade-row.hidden {
@@ -200,7 +217,7 @@
   }
 
   .grade-row button {
-    font-family: 'Inter', sans-serif;
+    font-family: 'JetBrains Mono', monospace;
     font-size: 0.8rem;
     font-weight: 500;
     border: 1px solid var(--border);
@@ -235,7 +252,7 @@
   .add-form input {
     flex: 1;
     min-width: 0;
-    font-family: 'Inter', sans-serif;
+    font-family: 'JetBrains Mono', monospace;
     font-size: 0.9rem;
     padding: 0.6rem 0.75rem;
     border: 1px solid var(--border);
@@ -255,7 +272,7 @@
     font-size: 0.85rem;
     font-weight: 700;
     background: var(--accent);
-    color: #fff;
+    color: #04342C;
     border: none;
     border-radius: 8px;
     padding: 0 1.1rem;
@@ -263,7 +280,7 @@
   }
 
   .add-form button:hover {
-    background: #2e4a63;
+    background: #9FE1CB;
   }
 
   .add-form button:disabled {
@@ -291,6 +308,18 @@
 
   @media (prefers-reduced-motion: reduce) {
     .flip-inner { transition: none; }
+  }
+
+  @media (max-width: 480px) {
+    body { padding: 1.5rem 0.75rem; }
+    h1 { font-size: 1.25rem; }
+    .card-zone, .flip-card, .flip-inner { min-height: 220px; }
+    .face .word { font-size: 1.4rem; }
+    .add-form { flex-direction: column; }
+    .add-form input { font-size: 16px; padding: 0.75rem; }
+    .add-form button { padding: 0.75rem 1.1rem; }
+    .grade-row { height: 48px; }
+    .grade-row button { font-size: 0.85rem; }
   }
 </style>
 </head>
@@ -346,6 +375,7 @@ const DAY = 86400000;
 let cards = [];
 let currentCard = null;
 let flipped = false;
+let practiceMode = false;
 
 function now() { return Date.now(); }
 
@@ -438,6 +468,9 @@ async function grade(card, quality) {
 
   flipped = false;
   currentCard = pickCard();
+  if (!currentCard && practiceMode && cards.length > 0) {
+    currentCard = cards[Math.floor(Math.random() * cards.length)];
+  }
   render();
 }
 
@@ -452,11 +485,27 @@ function renderCardZone() {
   }
 
   if (!currentCard) currentCard = pickCard();
+  if (currentCard) practiceMode = false;
 
   if (!currentCard) {
-    zone.innerHTML = '<div class="empty-state">Nothing due right now. Check back later, or add more words.</div>';
-    gradeRow.classList.add('hidden');
-    return;
+    if (practiceMode) {
+      currentCard = cards[Math.floor(Math.random() * cards.length)];
+    } else {
+      zone.innerHTML = `
+        <div class="empty-state">
+          <p style="margin:0 0 12px;">Nothing due right now. Check back later, or practice anyway.</p>
+          <button id="practiceAgainBtn">Practice again</button>
+        </div>
+      `;
+      gradeRow.classList.add('hidden');
+      document.getElementById('practiceAgainBtn').onclick = () => {
+        practiceMode = true;
+        flipped = false;
+        currentCard = cards[Math.floor(Math.random() * cards.length)];
+        render();
+      };
+      return;
+    }
   }
 
   const c = currentCard;
