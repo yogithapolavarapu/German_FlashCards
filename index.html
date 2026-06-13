@@ -116,7 +116,7 @@
 
   .stats {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr 1fr 1fr;
     gap: 12px;
     margin-bottom: 1.5rem;
   }
@@ -220,6 +220,35 @@
   .face.back .word {
     font-family: 'JetBrains Mono', monospace;
     font-weight: 600;
+  }
+
+  .icon-btn {
+    position: absolute;
+    background: none;
+    border: none;
+    color: var(--ink-soft);
+    cursor: pointer;
+    padding: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    font-size: 16px;
+  }
+
+  .icon-btn:hover {
+    color: var(--ink);
+    background: var(--accent-soft);
+  }
+
+  .speak-btn {
+    top: 10px;
+    right: 10px;
+  }
+
+  .edit-btn {
+    top: 10px;
+    left: 10px;
   }
 
   .empty-state {
@@ -401,6 +430,95 @@
     color: var(--ink-soft);
   }
 
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.25rem;
+    z-index: 50;
+  }
+
+  .modal-overlay.hidden {
+    display: none;
+  }
+
+  .modal {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.25rem;
+    width: 100%;
+    max-width: 360px;
+  }
+
+  .modal-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    font-size: 1rem;
+    margin: 0 0 1rem;
+    color: var(--ink);
+  }
+
+  .modal-label {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--ink-soft);
+    margin: 0.75rem 0 4px;
+  }
+
+  .modal input {
+    width: 100%;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.9rem;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--ink);
+  }
+
+  .modal input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+
+  .modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 1.25rem;
+  }
+
+  .modal-actions button {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 500;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--ink);
+    border-radius: 8px;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+  }
+
+  .modal-actions button:hover {
+    border-color: var(--accent);
+  }
+
+  .modal-actions button.primary {
+    background: var(--accent);
+    color: var(--btn-text);
+    border: none;
+  }
+
+  .modal-actions button.primary:hover {
+    background: var(--btn-hover);
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .flip-inner { transition: none; }
   }
@@ -439,6 +557,10 @@
       <p class="stat-label">Deck</p>
       <p class="stat-value" id="totalCount">0</p>
     </div>
+    <div class="stat">
+      <p class="stat-label">Streak</p>
+      <p class="stat-value" id="streakCount">0</p>
+    </div>
   </div>
 
   <div class="card-zone" id="cardZone">
@@ -472,6 +594,20 @@
   <footer>Saved to your Supabase database.</footer>
 </main>
 
+<div class="modal-overlay hidden" id="editOverlay">
+  <div class="modal">
+    <p class="modal-title">Edit card</p>
+    <label class="modal-label" for="editFront">German</label>
+    <input id="editFront" autocomplete="off" />
+    <label class="modal-label" for="editBack">English</label>
+    <input id="editBack" autocomplete="off" />
+    <div class="modal-actions">
+      <button id="editCancelBtn" type="button">Cancel</button>
+      <button id="editSaveBtn" type="button" class="primary">Save</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL = 'https://fthbysugxtuumkgsaful.supabase.co';
@@ -491,6 +627,59 @@ function now() { return Date.now(); }
 
 function escapeHtml(s) {
   return s.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+function speak(text) {
+  if (!('speechSynthesis' in window)) return;
+  window.speechSynthesis.cancel();
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.lang = 'de-DE';
+  window.speechSynthesis.speak(utter);
+}
+
+function todayStr() {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function daysBetween(a, b) {
+  const d1 = new Date(a);
+  const d2 = new Date(b);
+  return Math.round((d2 - d1) / 86400000);
+}
+
+let streakValue = 0;
+
+async function fetchStreak() {
+  const { data, error } = await sb.from('streaks').select('*').eq('id', 1).single();
+  if (error || !data) return;
+  streakValue = data.current_streak || 0;
+  document.getElementById('streakCount').textContent = streakValue;
+}
+
+async function recordPracticeToday() {
+  const { data, error } = await sb.from('streaks').select('*').eq('id', 1).single();
+  if (error || !data) return;
+  const today = todayStr();
+  const last = data.last_practiced_date;
+  let next = data.current_streak || 0;
+  if (last === today) {
+    return;
+  } else if (last && daysBetween(last, today) === 1) {
+    next = next + 1;
+  } else {
+    next = 1;
+  }
+  const { error: updErr } = await sb.from('streaks').update({
+    current_streak: next, last_practiced_date: today
+  }).eq('id', 1);
+  if (!updErr) {
+    streakValue = next;
+    document.getElementById('streakCount').textContent = streakValue;
+  }
 }
 
 function setStatus(msg, isError) {
@@ -569,6 +758,37 @@ async function deleteCard(id) {
   render();
 }
 
+let editingCard = null;
+
+function openEditModal(card) {
+  editingCard = card;
+  document.getElementById('editFront').value = card.front;
+  document.getElementById('editBack').value = card.back;
+  document.getElementById('editOverlay').classList.remove('hidden');
+}
+
+function closeEditModal() {
+  editingCard = null;
+  document.getElementById('editOverlay').classList.add('hidden');
+}
+
+async function saveEditedCard() {
+  if (!editingCard) return;
+  const front = document.getElementById('editFront').value.trim();
+  const back = document.getElementById('editBack').value.trim();
+  if (!front || !back) return;
+  const { error } = await sb.from('cards').update({ front, back }).eq('id', editingCard.id);
+  if (error) {
+    setStatus('Could not save edit: ' + error.message, true);
+    return;
+  }
+  editingCard.front = front;
+  editingCard.back = back;
+  closeEditModal();
+  setStatus('Card updated.');
+  render();
+}
+
 async function grade(card, quality) {
   card.reps += 1;
   let base;
@@ -587,6 +807,8 @@ async function grade(card, quality) {
   if (error) {
     setStatus('Could not update: ' + error.message, true);
   }
+
+  recordPracticeToday();
 
   flipped = false;
   dueQueue = dueQueue.filter(id => id !== card.id);
@@ -669,14 +891,35 @@ function renderCardZone() {
           <p class="lang">German</p>
           <p class="word">${escapeHtml(c.front)}</p>
           <p class="hint">Tap to reveal</p>
+          <button class="icon-btn speak-btn" id="speakBtn" aria-label="Pronounce word" title="Pronounce">
+            <i class="ti ti-volume" aria-hidden="true"></i>
+          </button>
+          <button class="icon-btn edit-btn" data-edit="front" aria-label="Edit card" title="Edit card">
+            <i class="ti ti-edit" aria-hidden="true"></i>
+          </button>
         </div>
         <div class="face back">
           <p class="lang">English</p>
           <p class="word">${escapeHtml(c.back)}</p>
+          <button class="icon-btn edit-btn" data-edit="back" aria-label="Edit card" title="Edit card">
+            <i class="ti ti-edit" aria-hidden="true"></i>
+          </button>
         </div>
       </div>
     </div>
   `;
+
+  document.getElementById('speakBtn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    speak(c.front);
+  });
+
+  zone.querySelectorAll('.edit-btn').forEach(b => {
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openEditModal(c);
+    });
+  });
 
   document.getElementById('flipCard').addEventListener('click', () => {
     if (!flipped) {
@@ -793,8 +1036,15 @@ document.getElementById('themeToggle').addEventListener('click', () => {
 
 initTheme();
 
+document.getElementById('editCancelBtn').addEventListener('click', closeEditModal);
+document.getElementById('editSaveBtn').addEventListener('click', saveEditedCard);
+document.getElementById('editOverlay').addEventListener('click', (e) => {
+  if (e.target.id === 'editOverlay') closeEditModal();
+});
+
 (async function init() {
   cards = await fetchCards();
+  await fetchStreak();
   render();
   if (cards.length === 0) setStatus('');
 })();
