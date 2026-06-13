@@ -718,15 +718,27 @@ document.getElementById('addForm').addEventListener('submit', async (e) => {
   }
 });
 
-document.getElementById('shuffleBtn').addEventListener('click', () => {
-  if (dueQueue.length > 1) {
-    dueQueue = shuffleArray(dueQueue);
-    flipped = false;
-    currentCard = cards.find(c => c.id === dueQueue[0]) || null;
-  } else if (cards.length > 0) {
-    flipped = false;
-    currentCard = cards[Math.floor(Math.random() * cards.length)];
+document.getElementById('shuffleBtn').addEventListener('click', async () => {
+  if (cards.length === 0) return;
+  setStatus('Shuffling and resetting progress...');
+  for (const c of cards) {
+    c.interval = 0;
+    c.due = now();
+    c.reps = 0;
+    c.lastQuality = null;
+    const { error } = await sb.from('cards').update({
+      interval: 0, due: c.due, reps: 0
+    }).eq('id', c.id);
+    if (error) {
+      setStatus('Could not update: ' + error.message, true);
+      return;
+    }
   }
+  setStatus('Deck reshuffled, progress reset.');
+  flipped = false;
+  practiceFilter = null;
+  dueQueue = shuffleArray(cards.map(c => c.id));
+  currentCard = cards.find(c => c.id === dueQueue[0]) || null;
   render();
 });
 
