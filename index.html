@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>German Flashcards</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F7F5F0;
+    --card: #FFFFFF;
+    --ink: #2B2A28;
+    --ink-soft: #6E6B64;
+    --accent: #3A5A78;
+    --accent-soft: #DCE6EE;
+    --gold: #C99A3B;
+    --gold-soft: #F6ECD6;
+    --border: #E4E0D8;
+    --red: #B5564A;
+    --red-soft: #F5E4E1;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 3rem 1.25rem;
+  }
+
+  main {
+    width: 100%;
+    max-width: 480px;
+  }
+
+  header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 2rem;
+  }
+
+  h1 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.4rem;
+    font-weight: 700;
+    margin: 0;
+    letter-spacing: -0.02em;
+  }
+
+  h1 span {
+    color: var(--accent);
+  }
+
+  .subtitle {
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+    margin: 4px 0 0;
+  }
+
+  .stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 1.5rem;
+  }
+
+  .stat {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.85rem 1rem;
+  }
+
+  .stat-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-soft);
+    margin: 0 0 4px;
+  }
+
+  .stat-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.6rem;
+    font-weight: 700;
+    margin: 0;
+  }
+
+  .stat.due .stat-value {
+    color: var(--accent);
+    border-bottom: 3px solid var(--gold);
+    display: inline-block;
+    padding-bottom: 2px;
+  }
+
+  /* card */
+  .card-zone {
+    perspective: 1200px;
+    margin-bottom: 1.5rem;
+    min-height: 180px;
+  }
+
+  .flip-card {
+    position: relative;
+    width: 100%;
+    min-height: 180px;
+    cursor: pointer;
+  }
+
+  .flip-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    min-height: 180px;
+    transition: transform 0.5s cubic-bezier(.2,.8,.2,1);
+    transform-style: preserve-3d;
+  }
+
+  .flip-card.flipped .flip-inner {
+    transform: rotateY(180deg);
+  }
+
+  .face {
+    position: absolute;
+    inset: 0;
+    backface-visibility: hidden;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 1.5rem;
+  }
+
+  .face .lang {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--ink-soft);
+    margin: 0 0 10px;
+  }
+
+  .face .word {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.6rem;
+    font-weight: 700;
+    margin: 0;
+    word-break: break-word;
+  }
+
+  .face .hint {
+    font-size: 0.75rem;
+    color: var(--ink-soft);
+    margin-top: 14px;
+  }
+
+  .face.back {
+    transform: rotateY(180deg);
+  }
+
+  .face.back .word {
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+  }
+
+  .empty-state {
+    background: var(--card);
+    border: 1px dashed var(--border);
+    border-radius: 14px;
+    min-height: 180px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: var(--ink-soft);
+    font-size: 0.9rem;
+    padding: 1.5rem;
+  }
+
+  /* grading */
+  .grade-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 2rem;
+    height: 42px;
+  }
+
+  .grade-row.hidden {
+    visibility: hidden;
+  }
+
+  .grade-row button {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 500;
+    border: 1px solid var(--border);
+    background: var(--card);
+    border-radius: 8px;
+    cursor: pointer;
+    color: var(--ink);
+    transition: background 0.15s, border-color 0.15s;
+  }
+
+  .grade-row button:hover {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+  }
+
+  .grade-row button[data-q="0"]:hover {
+    background: var(--red-soft);
+    border-color: var(--red);
+  }
+
+  .grade-row button[data-q="3"]:hover {
+    background: var(--gold-soft);
+    border-color: var(--gold);
+  }
+
+  /* add form */
+  .add-form {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 2.5rem;
+  }
+
+  .add-form input {
+    flex: 1;
+    min-width: 0;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.9rem;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card);
+    color: var(--ink);
+  }
+
+  .add-form input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+
+  .add-form button {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    font-weight: 700;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 0 1.1rem;
+    cursor: pointer;
+  }
+
+  .add-form button:hover {
+    background: #2e4a63;
+  }
+
+  /* deck list */
+  .deck-header {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-soft);
+    margin: 0 0 0.75rem;
+  }
+
+  .deck-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .deck-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.6rem 0.85rem;
+    font-size: 0.85rem;
+  }
+
+  .deck-item .pair {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding-right: 8px;
+  }
+
+  .deck-item .pair .de {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+  }
+
+  .deck-item .pair .en {
+    color: var(--ink-soft);
+  }
+
+  .deck-item .meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .deck-item .due-tag {
+    font-size: 0.7rem;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--ink-soft);
+    white-space: nowrap;
+  }
+
+  .deck-item .due-tag.now {
+    color: var(--accent);
+  }
+
+  .deck-item .del {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--ink-soft);
+    font-size: 1rem;
+    padding: 2px;
+    line-height: 1;
+  }
+
+  .deck-item .del:hover {
+    color: var(--red);
+  }
+
+  .empty-deck {
+    text-align: center;
+    color: var(--ink-soft);
+    font-size: 0.85rem;
+    padding: 1rem;
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+  }
+
+  footer {
+    margin-top: 2.5rem;
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--ink-soft);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .flip-inner { transition: none; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>vokabel<span>karten</span></h1>
+      <p class="subtitle">German vocabulary, spaced repetition</p>
+    </div>
+  </header>
+
+  <div class="stats">
+    <div class="stat due">
+      <p class="stat-label">Due now</p>
+      <p class="stat-value" id="dueCount">0</p>
+    </div>
+    <div class="stat">
+      <p class="stat-label">Total cards</p>
+      <p class="stat-value" id="totalCount">0</p>
+    </div>
+  </div>
+
+  <div class="card-zone" id="cardZone"></div>
+  <div class="grade-row hidden" id="gradeRow">
+    <button data-q="0">Again</button>
+    <button data-q="1">Hard</button>
+    <button data-q="2">Good</button>
+    <button data-q="3">Easy</button>
+  </div>
+
+  <form class="add-form" id="addForm">
+    <input id="frontInput" placeholder="German word" autocomplete="off" required />
+    <input id="backInput" placeholder="English meaning" autocomplete="off" required />
+    <button type="submit">Add</button>
+  </form>
+
+  <p class="deck-header">Your deck</p>
+  <div class="deck-list" id="deckList"></div>
+
+  <footer>Cards are saved in this browser only.</footer>
+</main>
+
+<script>
+const STORAGE_KEY = 'vokabelkarten-cards';
+const DAY = 86400000;
+
+let cards = loadCards();
+let currentCard = null;
+let flipped = false;
+
+function loadCards() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveCards() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(cards));
+  } catch (e) {}
+}
+
+function now() { return Date.now(); }
+
+function getDueCards() {
+  return cards.filter(c => c.due <= now());
+}
+
+function pickCard() {
+  const due = getDueCards();
+  if (due.length === 0) return null;
+  return due[Math.floor(Math.random() * due.length)];
+}
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+function addCard(front, back) {
+  cards.push({ id: Date.now() + Math.random(), front, back, interval: 0, due: now(), reps: 0 });
+  saveCards();
+  render();
+}
+
+function deleteCard(id) {
+  cards = cards.filter(c => String(c.id) !== String(id));
+  if (currentCard && String(currentCard.id) === String(id)) {
+    currentCard = null;
+    flipped = false;
+  }
+  saveCards();
+  render();
+}
+
+function grade(card, quality) {
+  if (quality === 0) {
+    card.interval = 0;
+    card.due = now() + 10 * 60000;
+    card.reps = 0;
+  } else {
+    card.reps += 1;
+    let base;
+    if (card.interval === 0) base = 1;
+    else if (card.interval === 1) base = quality === 1 ? 1 : (quality === 2 ? 3 : 4);
+    else base = card.interval * (quality === 1 ? 1.3 : quality === 2 ? 2.2 : 3);
+    card.interval = Math.max(1, Math.round(base));
+    card.due = now() + card.interval * DAY;
+  }
+  saveCards();
+  flipped = false;
+  currentCard = pickCard();
+  render();
+}
+
+function renderCardZone() {
+  const zone = document.getElementById('cardZone');
+  const gradeRow = document.getElementById('gradeRow');
+
+  if (cards.length === 0) {
+    zone.innerHTML = '<div class="empty-state">Add your first word below to start your deck.</div>';
+    gradeRow.classList.add('hidden');
+    return;
+  }
+
+  if (!currentCard) currentCard = pickCard();
+
+  if (!currentCard) {
+    zone.innerHTML = '<div class="empty-state">Nothing due right now. Check back later, or add more words.</div>';
+    gradeRow.classList.add('hidden');
+    return;
+  }
+
+  const c = currentCard;
+  zone.innerHTML = `
+    <div class="flip-card ${flipped ? 'flipped' : ''}" id="flipCard">
+      <div class="flip-inner">
+        <div class="face front">
+          <p class="lang">German</p>
+          <p class="word">${escapeHtml(c.front)}</p>
+          <p class="hint">Tap to reveal</p>
+        </div>
+        <div class="face back">
+          <p class="lang">English</p>
+          <p class="word">${escapeHtml(c.back)}</p>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('flipCard').addEventListener('click', () => {
+    if (!flipped) {
+      flipped = true;
+      render();
+    }
+  });
+
+  if (flipped) {
+    gradeRow.classList.remove('hidden');
+    gradeRow.querySelectorAll('button').forEach(b => {
+      b.onclick = (e) => {
+        e.stopPropagation();
+        grade(currentCard, parseInt(b.dataset.q, 10));
+      };
+    });
+  } else {
+    gradeRow.classList.add('hidden');
+  }
+}
+
+function renderDeckList() {
+  const list = document.getElementById('deckList');
+  if (cards.length === 0) {
+    list.innerHTML = '<div class="empty-deck">No cards yet.</div>';
+    return;
+  }
+  const sorted = [...cards].sort((a, b) => a.due - b.due);
+  list.innerHTML = sorted.map(c => {
+    const isDue = c.due <= now();
+    const tag = isDue ? 'due' : 'in ' + Math.max(1, Math.ceil((c.due - now()) / DAY)) + 'd';
+    return `
+      <div class="deck-item">
+        <div class="pair">
+          <span class="de">${escapeHtml(c.front)}</span>
+          <span class="en"> — ${escapeHtml(c.back)}</span>
+        </div>
+        <div class="meta">
+          <span class="due-tag ${isDue ? 'now' : ''}">${tag}</span>
+          <button class="del" data-id="${c.id}" aria-label="Delete card">&times;</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  list.querySelectorAll('.del').forEach(b => {
+    b.onclick = () => deleteCard(b.dataset.id);
+  });
+}
+
+function render() {
+  document.getElementById('dueCount').textContent = getDueCards().length;
+  document.getElementById('totalCount').textContent = cards.length;
+  renderCardZone();
+  renderDeckList();
+}
+
+document.getElementById('addForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const frontInput = document.getElementById('frontInput');
+  const backInput = document.getElementById('backInput');
+  const front = frontInput.value.trim();
+  const back = backInput.value.trim();
+  if (front && back) {
+    addCard(front, back);
+    frontInput.value = '';
+    backInput.value = '';
+    frontInput.focus();
+  }
+});
+
+render();
+</script>
+</body>
+</html>
