@@ -426,7 +426,7 @@
 const SUPABASE_URL = 'https://fthbysugxtuumkgsaful.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ0aGJ5c3VneHR1dW1rZ3NhZnVsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzMzc4NjksImV4cCI6MjA5NjkxMzg2OX0.wDI6EcWauFbTxQVnmoHXE7Y4xPO9EYUR_ZjZf-WkNH0';
 
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const DAY = 86400000;
 
@@ -447,7 +447,7 @@ function setStatus(msg, isError) {
 }
 
 async function fetchCards() {
-  const { data, error } = await supabase.from('cards').select('*').order('due', { ascending: true });
+  const { data, error } = await sb.from('cards').select('*').order('due', { ascending: true });
   if (error) {
     setStatus('Could not load cards: ' + error.message, true);
     return [];
@@ -469,7 +469,7 @@ async function addCard(front, back) {
   const addBtn = document.getElementById('addBtn');
   addBtn.disabled = true;
   setStatus('Saving...');
-  const { data, error } = await supabase.from('cards').insert({
+  const { data, error } = await sb.from('cards').insert({
     front, back, interval: 0, due: now(), reps: 0
   }).select();
   addBtn.disabled = false;
@@ -483,7 +483,7 @@ async function addCard(front, back) {
 }
 
 async function deleteCard(id) {
-  const { error } = await supabase.from('cards').delete().eq('id', id);
+  const { error } = await sb.from('cards').delete().eq('id', id);
   if (error) {
     setStatus('Could not delete: ' + error.message, true);
     return;
@@ -511,7 +511,7 @@ async function grade(card, quality) {
     card.due = now() + card.interval * DAY;
   }
 
-  const { error } = await supabase.from('cards').update({
+  const { error } = await sb.from('cards').update({
     interval: card.interval, due: card.due, reps: card.reps
   }).eq('id', card.id);
 
