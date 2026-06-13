@@ -222,6 +222,15 @@
     margin-top: 14px;
   }
 
+  .face .example {
+    font-size: 0.8rem;
+    font-family: var(--font-serif, Georgia, serif);
+    font-style: italic;
+    color: var(--ink-soft);
+    margin-top: 12px;
+    max-width: 90%;
+  }
+
   .face.back {
     transform: rotateY(180deg);
   }
@@ -400,6 +409,25 @@
     box-shadow: 0 0 0 3px var(--accent-soft);
   }
 
+  .example-input {
+    width: 100%;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.85rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card);
+    color: var(--ink);
+    margin-top: 8px;
+    margin-bottom: 1rem;
+  }
+
+  .example-input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+
   .add-form button {
     font-family: 'JetBrains Mono', monospace;
     font-size: 0.85rem;
@@ -553,6 +581,43 @@
     background: var(--accent-soft);
   }
 
+  .profile-list button .avatar-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    font-size: 13px;
+    margin-right: 8px;
+    vertical-align: middle;
+  }
+
+  .avatar-picker {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 6px 0 0.5rem;
+  }
+
+  .avatar-picker button {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    background: var(--bg);
+    font-size: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+  }
+
+  .avatar-picker button.selected {
+    border-color: var(--accent);
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .flip-inner { transition: none; }
   }
@@ -623,6 +688,7 @@
     <input id="backInput" placeholder="English meaning" autocomplete="off" required />
     <button type="submit" id="addBtn">Add</button>
   </form>
+  <input id="exampleInput" class="example-input" placeholder="Example sentence (optional)" autocomplete="off" />
   <p class="status-line" id="statusLine"></p>
 
   <footer>Saved to your Supabase database.</footer>
@@ -634,6 +700,9 @@
     <div class="profile-list" id="profileList"></div>
     <label class="modal-label" for="newProfileInput">Or add a new name</label>
     <input id="newProfileInput" autocomplete="off" placeholder="Your name" />
+    <label class="modal-label">Pick an avatar</label>
+    <div class="avatar-picker" id="emojiPicker"></div>
+    <div class="avatar-picker" id="colorPicker"></div>
     <div class="modal-actions">
       <button id="profileGoBtn" type="button" class="primary">Continue</button>
     </div>
@@ -647,6 +716,8 @@
     <input id="editFront" autocomplete="off" />
     <label class="modal-label" for="editBack">English</label>
     <input id="editBack" autocomplete="off" />
+    <label class="modal-label" for="editExample">Example sentence (optional)</label>
+    <input id="editExample" autocomplete="off" placeholder="e.g. Ich trinke Wasser." />
     <div class="modal-actions">
       <button id="editCancelBtn" type="button">Cancel</button>
       <button id="editSaveBtn" type="button" class="primary">Save</button>
@@ -773,12 +844,12 @@ function pickCard() {
   return cards.find(c => c.id === nextId) || null;
 }
 
-async function addCard(front, back) {
+async function addCard(front, back, example) {
   const addBtn = document.getElementById('addBtn');
   addBtn.disabled = true;
   setStatus('Saving...');
   const { data, error } = await sb.from('cards').insert({
-    front, back, interval: 0, due: now(), reps: 0, profile
+    front, back, interval: 0, due: now(), reps: 0, profile, example: example || null
   }).select();
   addBtn.disabled = false;
   if (error) {
@@ -810,6 +881,7 @@ function openEditModal(card) {
   editingCard = card;
   document.getElementById('editFront').value = card.front;
   document.getElementById('editBack').value = card.back;
+  document.getElementById('editExample').value = card.example || '';
   document.getElementById('editOverlay').classList.remove('hidden');
 }
 
@@ -822,14 +894,16 @@ async function saveEditedCard() {
   if (!editingCard) return;
   const front = document.getElementById('editFront').value.trim();
   const back = document.getElementById('editBack').value.trim();
+  const example = document.getElementById('editExample').value.trim();
   if (!front || !back) return;
-  const { error } = await sb.from('cards').update({ front, back }).eq('id', editingCard.id);
+  const { error } = await sb.from('cards').update({ front, back, example: example || null }).eq('id', editingCard.id);
   if (error) {
     setStatus('Could not save edit: ' + error.message, true);
     return;
   }
   editingCard.front = front;
   editingCard.back = back;
+  editingCard.example = example || null;
   closeEditModal();
   setStatus('Card updated.');
   render();
@@ -947,6 +1021,7 @@ function renderCardZone() {
         <div class="face back">
           <p class="lang">English</p>
           <p class="word">${escapeHtml(c.back)}</p>
+          ${c.example ? `<p class="example">${escapeHtml(c.example)}</p>` : ''}
           <button class="icon-btn edit-btn" data-edit="back" aria-label="Edit card" title="Edit card">
             <i class="ti ti-edit" aria-hidden="true"></i>
           </button>
@@ -997,12 +1072,15 @@ document.getElementById('addForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const frontInput = document.getElementById('frontInput');
   const backInput = document.getElementById('backInput');
+  const exampleInput = document.getElementById('exampleInput');
   const front = frontInput.value.trim();
   const back = backInput.value.trim();
+  const example = exampleInput.value.trim();
   if (front && back) {
-    await addCard(front, back);
+    await addCard(front, back, example);
     frontInput.value = '';
     backInput.value = '';
+    exampleInput.value = '';
     frontInput.focus();
   }
 });
@@ -1088,11 +1166,52 @@ document.getElementById('editOverlay').addEventListener('click', (e) => {
   if (e.target.id === 'editOverlay') closeEditModal();
 });
 
+const EMOJI_OPTIONS = ['🦊','🐻','🐱','🐶','🦉','🐢','🐸','🦁','🐼','🐧','🦄','🐝'];
+const COLOR_OPTIONS = ['#3A5A78','#C99A3B','#B5564A','#5B8BAE','#7DD3A8','#9C6ADE','#E07A5F','#4A9D8A'];
+
+let selectedEmoji = EMOJI_OPTIONS[0];
+let selectedColor = COLOR_OPTIONS[0];
+
+function renderAvatarPickers() {
+  const emojiEl = document.getElementById('emojiPicker');
+  emojiEl.innerHTML = EMOJI_OPTIONS.map(e =>
+    `<button type="button" data-emoji="${e}" class="${e === selectedEmoji ? 'selected' : ''}">${e}</button>`
+  ).join('');
+  emojiEl.querySelectorAll('button').forEach(b => {
+    b.addEventListener('click', () => {
+      selectedEmoji = b.dataset.emoji;
+      renderAvatarPickers();
+    });
+  });
+
+  const colorEl = document.getElementById('colorPicker');
+  colorEl.innerHTML = COLOR_OPTIONS.map(c =>
+    `<button type="button" data-color="${c}" style="background:${c};" class="${c === selectedColor ? 'selected' : ''}"></button>`
+  ).join('');
+  colorEl.querySelectorAll('button').forEach(b => {
+    b.addEventListener('click', () => {
+      selectedColor = b.dataset.color;
+      renderAvatarPickers();
+    });
+  });
+}
+
+function avatarChip(emoji, color) {
+  return `<span class="avatar-chip" style="background:${color || 'var(--accent-soft)'};">${emoji || ''}</span>`;
+}
+
 async function fetchKnownProfiles() {
-  const { data, error } = await sb.from('cards').select('profile');
-  if (error || !data) return [];
-  const set = new Set(data.map(r => r.profile).filter(Boolean));
-  return Array.from(set);
+  const { data: cardRows, error: cardErr } = await sb.from('cards').select('profile');
+  const { data: streakRows } = await sb.from('streaks').select('profile, avatar_emoji, avatar_color');
+  if (cardErr || !cardRows) return [];
+  const names = new Set(cardRows.map(r => r.profile).filter(Boolean));
+  const avatarMap = {};
+  (streakRows || []).forEach(r => { avatarMap[r.profile] = r; });
+  return Array.from(names).map(n => ({
+    name: n,
+    emoji: avatarMap[n] ? avatarMap[n].avatar_emoji : null,
+    color: avatarMap[n] ? avatarMap[n].avatar_color : null
+  }));
 }
 
 async function showProfilePicker() {
@@ -1102,23 +1221,36 @@ async function showProfilePicker() {
   if (known.length === 0) {
     list.innerHTML = '<p style="font-size:0.85rem; color: var(--ink-soft); margin:0;">No profiles yet — add the first name below.</p>';
   } else {
-    list.innerHTML = known.map(p => `<button data-profile="${escapeHtml(p)}">${escapeHtml(p)}</button>`).join('');
+    list.innerHTML = known.map(p =>
+      `<button data-profile="${escapeHtml(p.name)}">${avatarChip(p.emoji, p.color)}${escapeHtml(p.name)}</button>`
+    ).join('');
     list.querySelectorAll('button').forEach(b => {
       b.addEventListener('click', () => selectProfile(b.dataset.profile));
     });
   }
+  renderAvatarPickers();
   overlay.classList.remove('hidden');
 }
+
+let currentAvatar = { emoji: null, color: null };
 
 async function selectProfile(name) {
   name = name.trim();
   if (!name) return;
+  const isNew = !(await fetchKnownProfiles()).some(p => p.name === name);
   profile = name;
   try { localStorage.setItem('vokabelkarten-profile', profile); } catch (e) {}
   document.getElementById('profileOverlay').classList.add('hidden');
-  document.getElementById('profileLabel').textContent = profile;
   cards = await fetchCards();
   await fetchStreak();
+  if (isNew) {
+    currentAvatar = { emoji: selectedEmoji, color: selectedColor };
+    await sb.from('streaks').upsert({ profile, avatar_emoji: selectedEmoji, avatar_color: selectedColor });
+  } else {
+    const { data } = await sb.from('streaks').select('avatar_emoji, avatar_color').eq('profile', profile).maybeSingle();
+    currentAvatar = { emoji: data ? data.avatar_emoji : null, color: data ? data.avatar_color : null };
+  }
+  document.getElementById('profileLabel').innerHTML = avatarChip(currentAvatar.emoji, currentAvatar.color) + escapeHtml(profile);
   practiceFilter = null;
   dueQueue = [];
   currentCard = null;
