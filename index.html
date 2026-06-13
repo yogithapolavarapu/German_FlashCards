@@ -597,6 +597,36 @@
     padding: 1rem;
   }
 
+  .progress-wrap {
+    padding: 0.75rem 0 1rem;
+  }
+
+  .progress-label {
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+    margin-bottom: 0.6rem;
+  }
+
+  .progress-label span {
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  .progress-bar-bg {
+    width: 100%;
+    height: 10px;
+    background: var(--border);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+
+  .progress-bar-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 999px;
+    transition: width 0.4s ease;
+  }
+
   .modal-overlay {
     position: fixed;
     inset: 0;
@@ -833,10 +863,17 @@
   </div>
 
   <button class="section-toggle" id="chartToggle" type="button">
-    <i class="ti ti-chevron-down" aria-hidden="true"></i> Progress
+    <i class="ti ti-chevron-down" aria-hidden="true"></i> Today's progress
   </button>
   <div class="deck-section hidden" id="chartSection">
-    <canvas id="growthChart" height="160"></canvas>
+    <div class="progress-wrap">
+      <div class="progress-label">
+        <span id="progressText">0 of 0 cards practiced today</span>
+      </div>
+      <div class="progress-bar-bg">
+        <div class="progress-bar-fill" id="progressFill" style="width:0%"></div>
+      </div>
+    </div>
   </div>
 
   <footer>Saved to your Supabase database.</footer>
@@ -875,7 +912,6 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <script>
 const SUPABASE_URL = 'https://fthbysugxtuumkgsaful.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ0aGJ5c3VneHR1dW1rZ3NhZnVsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzMzc4NjksImV4cCI6MjA5NjkxMzg2OX0.wDI6EcWauFbTxQVnmoHXE7Y4xPO9EYUR_ZjZf-WkNH0';
@@ -925,27 +961,33 @@ async function fetchStreak() {
   const { data, error } = await sb.from('streaks').select('*').eq('profile', profile).maybeSingle();
   if (error) return;
   streakValue = data ? (data.current_streak || 0) : 0;
+  const today = todayStr();
+  practicedToday = (data && data.last_practiced_date === today) ? (data.practiced_today || 0) : 0;
   document.getElementById('streakCount').textContent = streakValue;
+  renderProgress();
 }
 
 async function recordPracticeToday() {
   const { data } = await sb.from('streaks').select('*').eq('profile', profile).maybeSingle();
   const today = todayStr();
   const last = data ? data.last_practiced_date : null;
-  let next = data ? (data.current_streak || 0) : 0;
-  if (last === today) {
-    return;
-  } else if (last && daysBetween(last, today) === 1) {
-    next = next + 1;
-  } else {
-    next = 1;
+  let nextStreak = data ? (data.current_streak || 0) : 0;
+  let nextPracticedToday = (last === today) ? (data.practiced_today || 0) + 1 : 1;
+  if (last !== today) {
+    if (last && daysBetween(last, today) === 1) {
+      nextStreak = nextStreak + 1;
+    } else {
+      nextStreak = 1;
+    }
   }
   const { error: updErr } = await sb.from('streaks').upsert({
-    profile, current_streak: next, last_practiced_date: today
+    profile, current_streak: nextStreak, last_practiced_date: today, practiced_today: nextPracticedToday
   });
   if (!updErr) {
-    streakValue = next;
+    streakValue = nextStreak;
+    practicedToday = nextPracticedToday;
     document.getElementById('streakCount').textContent = streakValue;
+    renderProgress();
   }
 }
 
@@ -1220,6 +1262,7 @@ function render() {
   document.getElementById('totalCount').textContent = cards.length;
   renderCardZone();
   renderDeckList();
+  renderProgress();
 }
 
 function renderDeckList() {
@@ -1352,8 +1395,6 @@ document.getElementById('themeToggle').addEventListener('click', () => {
   const next = current === 'dark' ? 'light' : 'dark';
   applyTheme(next);
   try { localStorage.setItem('vokabelkarten-theme', next); } catch (e) {}
-  const chartSection = document.getElementById('chartSection');
-  if (chartSection && !chartSection.classList.contains('hidden')) renderGrowthChart();
 });
 
 initTheme();
@@ -1371,72 +1412,19 @@ function setupSectionToggle(toggleId, sectionId, onOpen) {
 }
 
 setupSectionToggle('deckToggle', 'deckSection', renderDeckList);
-setupSectionToggle('chartToggle', 'chartSection', renderGrowthChart);
+setupSectionToggle('chartToggle', 'chartSection', renderProgress);
 
 document.getElementById('deckSearch').addEventListener('input', renderDeckList);
 
-// Progress chart
-let growthChartInstance = null;
+let practicedToday = 0;
 
-function renderGrowthChart() {
-  const canvas = document.getElementById('growthChart');
-  if (!canvas || typeof Chart === 'undefined') return;
-  if (cards.length === 0) {
-    canvas.style.display = 'none';
-    let msg = document.getElementById('chartEmptyMsg');
-    if (!msg) {
-      msg = document.createElement('div');
-      msg.id = 'chartEmptyMsg';
-      msg.className = 'deck-empty';
-      msg.textContent = 'Add some cards to see your progress.';
-      canvas.parentNode.appendChild(msg);
-    }
-    return;
-  }
-  canvas.style.display = 'block';
-  const existingMsg = document.getElementById('chartEmptyMsg');
-  if (existingMsg) existingMsg.remove();
-
-  const sorted = [...cards].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-  const labels = [];
-  const data = [];
-  let count = 0;
-  sorted.forEach(c => {
-    count++;
-    const d = new Date(c.created_at);
-    labels.push(d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }));
-    data.push(count);
-  });
-
-  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-  const gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
-  const textColor = isDark ? '#8B949E' : '#6E6B64';
-  const lineColor = isDark ? '#5B8BAE' : '#3A5A78';
-
-  if (growthChartInstance) growthChartInstance.destroy();
-  growthChartInstance = new Chart(canvas, {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [{
-        label: 'Total cards',
-        data,
-        borderColor: lineColor,
-        backgroundColor: lineColor,
-        tension: 0.2,
-        pointRadius: 2,
-        fill: false
-      }]
-    },
-    options: {
-      responsive: true,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { ticks: { color: textColor, maxTicksLimit: 6 }, grid: { color: gridColor } },
-        y: { ticks: { color: textColor, precision: 0 }, grid: { color: gridColor }, beginAtZero: true }
-      }
-    }
-  });
+function renderProgress() {
+  const total = cards.length;
+  const pct = total > 0 ? Math.min(100, Math.round((practicedToday / total) * 100)) : 0;
+  const fill = document.getElementById('progressFill');
+  const text = document.getElementById('progressText');
+  if (fill) fill.style.width = pct + '%';
+  if (text) text.textContent = `${practicedToday} of ${total} cards practiced today`;
 }
 
 document.getElementById('editCancelBtn').addEventListener('click', closeEditModal);
