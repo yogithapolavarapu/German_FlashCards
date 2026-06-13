@@ -171,7 +171,7 @@
 
   .card-zone {
     perspective: 1200px;
-    margin-bottom: 1rem;
+    margin-bottom: 1.5rem;
     min-height: 180px;
   }
 
@@ -1211,16 +1211,13 @@ function renderDeckList() {
   const list = document.getElementById('deckList');
   if (!list) return;
   const query = (document.getElementById('deckSearch').value || '').trim().toLowerCase();
-  let filtered = cards;
-  if (query) {
-    filtered = cards.filter(c =>
-      c.front.toLowerCase().includes(query) || c.back.toLowerCase().includes(query)
-    );
-  }
-  if (cards.length === 0) {
-    list.innerHTML = '<div class="deck-empty">No cards yet.</div>';
+  if (!query) {
+    list.innerHTML = '<div class="deck-empty">Type to search your deck.</div>';
     return;
   }
+  const filtered = cards.filter(c =>
+    c.front.toLowerCase().includes(query) || c.back.toLowerCase().includes(query)
+  );
   if (filtered.length === 0) {
     list.innerHTML = '<div class="deck-empty">No matches.</div>';
     return;
