@@ -72,7 +72,7 @@
     flex-shrink: 0;
   }
 
-  #themeToggle, #soundToggle {
+  #themeToggle {
     background: var(--card);
     border: 1px solid var(--border);
     border-radius: 8px;
@@ -88,7 +88,7 @@
     font-size: 16px;
   }
 
-  #themeToggle:hover, #soundToggle:hover {
+  #themeToggle:hover {
     border-color: var(--accent);
     color: var(--ink);
   }
@@ -760,9 +760,6 @@
       <p class="subtitle">German vocabulary, spaced repetition &middot; <span id="profileLabel"></span> &middot; <a href="#" id="switchProfileLink">switch</a></p>
     </div>
     <div class="header-actions">
-      <button id="soundToggle" aria-label="Toggle flip sound" title="Toggle flip sound">
-        <i class="ti ti-volume" id="soundIcon" aria-hidden="true"></i>
-      </button>
       <button id="themeToggle" aria-label="Toggle dark mode" title="Toggle dark mode">
         <div class="inner-box"></div>
       </button>
@@ -1182,7 +1179,6 @@ function renderCardZone() {
   document.getElementById('flipCard').addEventListener('click', () => {
     if (!flipped) {
       flipped = true;
-      playFlipSound();
       render();
     }
   });
@@ -1339,47 +1335,6 @@ document.getElementById('themeToggle').addEventListener('click', () => {
 });
 
 initTheme();
-
-// Sound toggle
-let soundEnabled = false;
-
-function applySoundIcon() {
-  const icon = document.getElementById('soundIcon');
-  icon.className = 'ti ' + (soundEnabled ? 'ti-volume' : 'ti-volume-off');
-}
-
-function initSound() {
-  let val = false;
-  try { val = localStorage.getItem('vokabelkarten-sound') === '1'; } catch (e) {}
-  soundEnabled = val;
-  applySoundIcon();
-}
-
-document.getElementById('soundToggle').addEventListener('click', () => {
-  soundEnabled = !soundEnabled;
-  try { localStorage.setItem('vokabelkarten-sound', soundEnabled ? '1' : '0'); } catch (e) {}
-  applySoundIcon();
-});
-
-function playFlipSound() {
-  if (!soundEnabled) return;
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(600, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(300, ctx.currentTime + 0.1);
-    gain.gain.setValueAtTime(0.08, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.15);
-  } catch (e) {}
-}
-
-initSound();
 
 // Section toggles
 function setupSectionToggle(toggleId, sectionId, onOpen) {
