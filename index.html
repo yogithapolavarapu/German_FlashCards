@@ -1463,7 +1463,7 @@ let activityData = {};
 
 async function fetchActivity() {
   const since = new Date();
-  since.setDate(since.getDate() - 105); // ~15 weeks
+  since.setDate(since.getDate() - 91); // ~13 weeks
   const sinceStr = since.toISOString().split('T')[0];
   const { data, error } = await sb.from('activity').select('date, count').eq('profile', profile).gte('date', sinceStr);
   if (error) return;
@@ -1491,15 +1491,12 @@ function renderHeatmap() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const dayOfWeek = today.getDay(); // 0=Sun
-  const totalWeeks = 15;
-  const totalDays = totalWeeks * 7;
 
-  // Start from Sunday of the earliest week
-  const start = new Date(today);
-  start.setDate(start.getDate() - (totalDays - 1) + (6 - dayOfWeek));
-  // Actually align to start of week (Sunday)
+  // End on today, start 13 weeks back from the Sunday of today's week
   const startAdj = new Date(today);
-  startAdj.setDate(startAdj.getDate() - (totalDays - 1 + dayOfWeek));
+  startAdj.setDate(startAdj.getDate() - dayOfWeek - (13 * 7 - 7));
+
+  const totalDays = 13 * 7 - (6 - dayOfWeek); // partial last week ends today
 
   const maxCount = Math.max(1, ...Object.values(activityData));
 
