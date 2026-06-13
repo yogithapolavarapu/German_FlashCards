@@ -114,6 +114,15 @@
     margin: 4px 0 0;
   }
 
+  .subtitle a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+
+  .subtitle a:hover {
+    text-decoration: underline;
+  }
+
   .stats {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
@@ -519,6 +528,31 @@
     background: var(--btn-hover);
   }
 
+  .profile-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 1rem;
+  }
+
+  .profile-list button {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 500;
+    text-align: left;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--ink);
+    border-radius: 8px;
+    padding: 0.6rem 0.85rem;
+    cursor: pointer;
+  }
+
+  .profile-list button:hover {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .flip-inner { transition: none; }
   }
@@ -541,7 +575,7 @@
   <header>
     <div>
       <h1>vokabel<span>karten</span></h1>
-      <p class="subtitle">German vocabulary, spaced repetition</p>
+      <p class="subtitle">German vocabulary, spaced repetition &middot; <span id="profileLabel"></span> &middot; <a href="#" id="switchProfileLink">switch</a></p>
     </div>
     <button id="themeToggle" aria-label="Toggle dark mode" title="Toggle dark mode">
       <div class="inner-box"></div>
@@ -594,6 +628,18 @@
   <footer>Saved to your Supabase database.</footer>
 </main>
 
+<div class="modal-overlay hidden" id="profileOverlay">
+  <div class="modal">
+    <p class="modal-title">Who's practicing?</p>
+    <div class="profile-list" id="profileList"></div>
+    <label class="modal-label" for="newProfileInput">Or add a new name</label>
+    <input id="newProfileInput" autocomplete="off" placeholder="Your name" />
+    <div class="modal-actions">
+      <button id="profileGoBtn" type="button" class="primary">Continue</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay hidden" id="editOverlay">
   <div class="modal">
     <p class="modal-title">Edit card</p>
@@ -622,6 +668,7 @@ let currentCard = null;
 let flipped = false;
 let practiceFilter = null;
 let dueQueue = [];
+let profile = '';
 
 function now() { return Date.now(); }
 
@@ -654,18 +701,17 @@ function daysBetween(a, b) {
 let streakValue = 0;
 
 async function fetchStreak() {
-  const { data, error } = await sb.from('streaks').select('*').eq('id', 1).single();
-  if (error || !data) return;
-  streakValue = data.current_streak || 0;
+  const { data, error } = await sb.from('streaks').select('*').eq('profile', profile).maybeSingle();
+  if (error) return;
+  streakValue = data ? (data.current_streak || 0) : 0;
   document.getElementById('streakCount').textContent = streakValue;
 }
 
 async function recordPracticeToday() {
-  const { data, error } = await sb.from('streaks').select('*').eq('id', 1).single();
-  if (error || !data) return;
+  const { data } = await sb.from('streaks').select('*').eq('profile', profile).maybeSingle();
   const today = todayStr();
-  const last = data.last_practiced_date;
-  let next = data.current_streak || 0;
+  const last = data ? data.last_practiced_date : null;
+  let next = data ? (data.current_streak || 0) : 0;
   if (last === today) {
     return;
   } else if (last && daysBetween(last, today) === 1) {
@@ -673,9 +719,9 @@ async function recordPracticeToday() {
   } else {
     next = 1;
   }
-  const { error: updErr } = await sb.from('streaks').update({
-    current_streak: next, last_practiced_date: today
-  }).eq('id', 1);
+  const { error: updErr } = await sb.from('streaks').upsert({
+    profile, current_streak: next, last_practiced_date: today
+  });
   if (!updErr) {
     streakValue = next;
     document.getElementById('streakCount').textContent = streakValue;
@@ -689,7 +735,7 @@ function setStatus(msg, isError) {
 }
 
 async function fetchCards() {
-  const { data, error } = await sb.from('cards').select('*').order('due', { ascending: true });
+  const { data, error } = await sb.from('cards').select('*').eq('profile', profile).order('due', { ascending: true });
   if (error) {
     setStatus('Could not load cards: ' + error.message, true);
     return [];
@@ -732,7 +778,7 @@ async function addCard(front, back) {
   addBtn.disabled = true;
   setStatus('Saving...');
   const { data, error } = await sb.from('cards').insert({
-    front, back, interval: 0, due: now(), reps: 0
+    front, back, interval: 0, due: now(), reps: 0, profile
   }).select();
   addBtn.disabled = false;
   if (error) {
@@ -1042,11 +1088,71 @@ document.getElementById('editOverlay').addEventListener('click', (e) => {
   if (e.target.id === 'editOverlay') closeEditModal();
 });
 
-(async function init() {
+async function fetchKnownProfiles() {
+  const { data, error } = await sb.from('cards').select('profile');
+  if (error || !data) return [];
+  const set = new Set(data.map(r => r.profile).filter(Boolean));
+  return Array.from(set);
+}
+
+async function showProfilePicker() {
+  const overlay = document.getElementById('profileOverlay');
+  const list = document.getElementById('profileList');
+  const known = await fetchKnownProfiles();
+  if (known.length === 0) {
+    list.innerHTML = '<p style="font-size:0.85rem; color: var(--ink-soft); margin:0;">No profiles yet — add the first name below.</p>';
+  } else {
+    list.innerHTML = known.map(p => `<button data-profile="${escapeHtml(p)}">${escapeHtml(p)}</button>`).join('');
+    list.querySelectorAll('button').forEach(b => {
+      b.addEventListener('click', () => selectProfile(b.dataset.profile));
+    });
+  }
+  overlay.classList.remove('hidden');
+}
+
+async function selectProfile(name) {
+  name = name.trim();
+  if (!name) return;
+  profile = name;
+  try { localStorage.setItem('vokabelkarten-profile', profile); } catch (e) {}
+  document.getElementById('profileOverlay').classList.add('hidden');
+  document.getElementById('profileLabel').textContent = profile;
   cards = await fetchCards();
   await fetchStreak();
+  practiceFilter = null;
+  dueQueue = [];
+  currentCard = null;
+  flipped = false;
   render();
   if (cards.length === 0) setStatus('');
+}
+
+document.getElementById('profileGoBtn').addEventListener('click', () => {
+  const input = document.getElementById('newProfileInput');
+  const name = input.value.trim();
+  if (name) {
+    input.value = '';
+    selectProfile(name);
+  }
+});
+
+document.getElementById('newProfileInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('profileGoBtn').click();
+});
+
+document.getElementById('switchProfileLink').addEventListener('click', (e) => {
+  e.preventDefault();
+  showProfilePicker();
+});
+
+(async function init() {
+  let saved = '';
+  try { saved = localStorage.getItem('vokabelkarten-profile') || ''; } catch (e) {}
+  if (saved) {
+    await selectProfile(saved);
+  } else {
+    await showProfilePicker();
+  }
 })();
 </script>
 </body>
