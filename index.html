@@ -63,9 +63,16 @@
     align-items: center;
     justify-content: space-between;
     margin-bottom: 2rem;
+    gap: 8px;
   }
 
-  #themeToggle {
+  .header-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  #themeToggle, #soundToggle {
     background: var(--card);
     border: 1px solid var(--border);
     border-radius: 8px;
@@ -77,10 +84,13 @@
     cursor: pointer;
     flex-shrink: 0;
     padding: 7px;
+    color: var(--ink-soft);
+    font-size: 16px;
   }
 
-  #themeToggle:hover {
+  #themeToggle:hover, #soundToggle:hover {
     border-color: var(--accent);
+    color: var(--ink);
   }
 
   #themeToggle .inner-box {
@@ -467,6 +477,113 @@
     color: var(--ink-soft);
   }
 
+  .section-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    background: none;
+    border: none;
+    color: var(--ink-soft);
+    font-family: 'Inter', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 0.75rem 0;
+    border-top: 1px solid var(--border);
+    cursor: pointer;
+  }
+
+  .section-toggle:hover {
+    color: var(--ink);
+  }
+
+  .section-toggle i {
+    font-size: 14px;
+    transition: transform 0.15s;
+  }
+
+  .section-toggle.open i {
+    transform: rotate(180deg);
+  }
+
+  .deck-section {
+    padding-bottom: 1rem;
+  }
+
+  .deck-section.hidden {
+    display: none;
+  }
+
+  .deck-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 300px;
+    overflow-y: auto;
+    margin-top: 0.75rem;
+  }
+
+  .deck-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.6rem 0.85rem;
+    font-size: 0.85rem;
+    gap: 8px;
+  }
+
+  .deck-item .pair {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
+
+  .deck-item .pair .de {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+  }
+
+  .deck-item .pair .en {
+    color: var(--ink-soft);
+  }
+
+  .deck-item .deck-actions {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+
+  .deck-item .deck-actions button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--ink-soft);
+    font-size: 14px;
+    padding: 4px;
+    display: flex;
+  }
+
+  .deck-item .deck-actions button:hover {
+    color: var(--ink);
+  }
+
+  .deck-item .deck-actions .del:hover {
+    color: var(--red);
+  }
+
+  .deck-empty {
+    text-align: center;
+    color: var(--ink-soft);
+    font-size: 0.85rem;
+    padding: 1rem;
+  }
+
   .modal-overlay {
     position: fixed;
     inset: 0;
@@ -642,9 +759,14 @@
       <h1>vokabel<span>karten</span></h1>
       <p class="subtitle">German vocabulary, spaced repetition &middot; <span id="profileLabel"></span> &middot; <a href="#" id="switchProfileLink">switch</a></p>
     </div>
-    <button id="themeToggle" aria-label="Toggle dark mode" title="Toggle dark mode">
-      <div class="inner-box"></div>
-    </button>
+    <div class="header-actions">
+      <button id="soundToggle" aria-label="Toggle flip sound" title="Toggle flip sound">
+        <i class="ti ti-volume" id="soundIcon" aria-hidden="true"></i>
+      </button>
+      <button id="themeToggle" aria-label="Toggle dark mode" title="Toggle dark mode">
+        <div class="inner-box"></div>
+      </button>
+    </div>
   </header>
 
   <div class="stats">
@@ -691,6 +813,21 @@
   <input id="exampleInput" class="example-input" placeholder="Example sentence (optional)" autocomplete="off" />
   <p class="status-line" id="statusLine"></p>
 
+  <button class="section-toggle" id="deckToggle" type="button">
+    <i class="ti ti-chevron-down" aria-hidden="true"></i> Your deck
+  </button>
+  <div class="deck-section hidden" id="deckSection">
+    <input id="deckSearch" class="example-input" placeholder="Search German or English..." autocomplete="off" />
+    <div class="deck-list" id="deckList"></div>
+  </div>
+
+  <button class="section-toggle" id="chartToggle" type="button">
+    <i class="ti ti-chevron-down" aria-hidden="true"></i> Progress
+  </button>
+  <div class="deck-section hidden" id="chartSection">
+    <canvas id="growthChart" height="160"></canvas>
+  </div>
+
   <footer>Saved to your Supabase database.</footer>
 </main>
 
@@ -726,6 +863,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <script>
 const SUPABASE_URL = 'https://fthbysugxtuumkgsaful.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ0aGJ5c3VneHR1dW1rZ3NhZnVsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzMzc4NjksImV4cCI6MjA5NjkxMzg2OX0.wDI6EcWauFbTxQVnmoHXE7Y4xPO9EYUR_ZjZf-WkNH0';
@@ -1045,6 +1183,7 @@ function renderCardZone() {
   document.getElementById('flipCard').addEventListener('click', () => {
     if (!flipped) {
       flipped = true;
+      playFlipSound();
       render();
     }
   });
@@ -1066,6 +1205,49 @@ function render() {
   document.getElementById('dueCount').textContent = getPracticedCards().length;
   document.getElementById('totalCount').textContent = cards.length;
   renderCardZone();
+  renderDeckList();
+}
+
+function renderDeckList() {
+  const list = document.getElementById('deckList');
+  if (!list) return;
+  const query = (document.getElementById('deckSearch').value || '').trim().toLowerCase();
+  let filtered = cards;
+  if (query) {
+    filtered = cards.filter(c =>
+      c.front.toLowerCase().includes(query) || c.back.toLowerCase().includes(query)
+    );
+  }
+  if (cards.length === 0) {
+    list.innerHTML = '<div class="deck-empty">No cards yet.</div>';
+    return;
+  }
+  if (filtered.length === 0) {
+    list.innerHTML = '<div class="deck-empty">No matches.</div>';
+    return;
+  }
+  const sorted = [...filtered].sort((a, b) => a.front.localeCompare(b.front));
+  list.innerHTML = sorted.map(c => `
+    <div class="deck-item">
+      <div class="pair">
+        <span class="de">${escapeHtml(c.front)}</span>
+        <span class="en"> — ${escapeHtml(c.back)}</span>
+      </div>
+      <div class="deck-actions">
+        <button class="deck-edit" data-id="${c.id}" aria-label="Edit card" title="Edit"><i class="ti ti-edit" aria-hidden="true"></i></button>
+        <button class="del" data-id="${c.id}" aria-label="Delete card" title="Delete"><i class="ti ti-trash" aria-hidden="true"></i></button>
+      </div>
+    </div>
+  `).join('');
+  list.querySelectorAll('.deck-edit').forEach(b => {
+    b.addEventListener('click', () => {
+      const card = cards.find(c => String(c.id) === b.dataset.id);
+      if (card) openEditModal(card);
+    });
+  });
+  list.querySelectorAll('.del').forEach(b => {
+    b.addEventListener('click', () => deleteCard(b.dataset.id));
+  });
 }
 
 document.getElementById('addForm').addEventListener('submit', async (e) => {
@@ -1156,9 +1338,133 @@ document.getElementById('themeToggle').addEventListener('click', () => {
   const next = current === 'dark' ? 'light' : 'dark';
   applyTheme(next);
   try { localStorage.setItem('vokabelkarten-theme', next); } catch (e) {}
+  const chartSection = document.getElementById('chartSection');
+  if (chartSection && !chartSection.classList.contains('hidden')) renderGrowthChart();
 });
 
 initTheme();
+
+// Sound toggle
+let soundEnabled = false;
+
+function applySoundIcon() {
+  const icon = document.getElementById('soundIcon');
+  icon.className = 'ti ' + (soundEnabled ? 'ti-volume' : 'ti-volume-off');
+}
+
+function initSound() {
+  let val = false;
+  try { val = localStorage.getItem('vokabelkarten-sound') === '1'; } catch (e) {}
+  soundEnabled = val;
+  applySoundIcon();
+}
+
+document.getElementById('soundToggle').addEventListener('click', () => {
+  soundEnabled = !soundEnabled;
+  try { localStorage.setItem('vokabelkarten-sound', soundEnabled ? '1' : '0'); } catch (e) {}
+  applySoundIcon();
+});
+
+function playFlipSound() {
+  if (!soundEnabled) return;
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(600, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(300, ctx.currentTime + 0.1);
+    gain.gain.setValueAtTime(0.08, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.15);
+  } catch (e) {}
+}
+
+initSound();
+
+// Section toggles
+function setupSectionToggle(toggleId, sectionId, onOpen) {
+  const toggle = document.getElementById(toggleId);
+  const section = document.getElementById(sectionId);
+  toggle.addEventListener('click', () => {
+    const isHidden = section.classList.contains('hidden');
+    section.classList.toggle('hidden');
+    toggle.classList.toggle('open');
+    if (isHidden && onOpen) onOpen();
+  });
+}
+
+setupSectionToggle('deckToggle', 'deckSection', renderDeckList);
+setupSectionToggle('chartToggle', 'chartSection', renderGrowthChart);
+
+document.getElementById('deckSearch').addEventListener('input', renderDeckList);
+
+// Progress chart
+let growthChartInstance = null;
+
+function renderGrowthChart() {
+  const canvas = document.getElementById('growthChart');
+  if (!canvas || typeof Chart === 'undefined') return;
+  if (cards.length === 0) {
+    canvas.style.display = 'none';
+    let msg = document.getElementById('chartEmptyMsg');
+    if (!msg) {
+      msg = document.createElement('div');
+      msg.id = 'chartEmptyMsg';
+      msg.className = 'deck-empty';
+      msg.textContent = 'Add some cards to see your progress.';
+      canvas.parentNode.appendChild(msg);
+    }
+    return;
+  }
+  canvas.style.display = 'block';
+  const existingMsg = document.getElementById('chartEmptyMsg');
+  if (existingMsg) existingMsg.remove();
+
+  const sorted = [...cards].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  const labels = [];
+  const data = [];
+  let count = 0;
+  sorted.forEach(c => {
+    count++;
+    const d = new Date(c.created_at);
+    labels.push(d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }));
+    data.push(count);
+  });
+
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+  const textColor = isDark ? '#8B949E' : '#6E6B64';
+  const lineColor = isDark ? '#5B8BAE' : '#3A5A78';
+
+  if (growthChartInstance) growthChartInstance.destroy();
+  growthChartInstance = new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Total cards',
+        data,
+        borderColor: lineColor,
+        backgroundColor: lineColor,
+        tension: 0.2,
+        pointRadius: 2,
+        fill: false
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: textColor, maxTicksLimit: 6 }, grid: { color: gridColor } },
+        y: { ticks: { color: textColor, precision: 0 }, grid: { color: gridColor }, beginAtZero: true }
+      }
+    }
+  });
+}
 
 document.getElementById('editCancelBtn').addEventListener('click', closeEditModal);
 document.getElementById('editSaveBtn').addEventListener('click', saveEditedCard);
