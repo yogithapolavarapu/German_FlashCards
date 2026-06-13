@@ -101,7 +101,6 @@
     padding-bottom: 2px;
   }
 
-  /* card */
   .card-zone {
     perspective: 1200px;
     margin-bottom: 1.5rem;
@@ -188,7 +187,6 @@
     padding: 1.5rem;
   }
 
-  /* grading */
   .grade-row {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -228,11 +226,10 @@
     border-color: var(--gold);
   }
 
-  /* add form */
   .add-form {
     display: flex;
     gap: 8px;
-    margin-bottom: 2.5rem;
+    margin-bottom: 1rem;
   }
 
   .add-form input {
@@ -269,7 +266,22 @@
     background: #2e4a63;
   }
 
-  /* deck list */
+  .add-form button:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
+
+  .status-line {
+    font-size: 0.75rem;
+    color: var(--ink-soft);
+    margin: 0 0 2rem;
+    min-height: 1em;
+  }
+
+  .status-line.error {
+    color: var(--red);
+  }
+
   .deck-header {
     font-size: 0.8rem;
     text-transform: uppercase;
@@ -384,7 +396,9 @@
     </div>
   </div>
 
-  <div class="card-zone" id="cardZone"></div>
+  <div class="card-zone" id="cardZone">
+    <div class="empty-state">Loading your deck&hellip;</div>
+  </div>
   <div class="grade-row hidden" id="gradeRow">
     <button data-q="0">Again</button>
     <button data-q="1">Hard</button>
@@ -395,39 +409,51 @@
   <form class="add-form" id="addForm">
     <input id="frontInput" placeholder="German word" autocomplete="off" required />
     <input id="backInput" placeholder="English meaning" autocomplete="off" required />
-    <button type="submit">Add</button>
+    <button type="submit" id="addBtn">Add</button>
   </form>
+  <p class="status-line" id="statusLine"></p>
 
   <p class="deck-header">Your deck</p>
-  <div class="deck-list" id="deckList"></div>
+  <div class="deck-list" id="deckList">
+    <div class="empty-deck">Loading&hellip;</div>
+  </div>
 
-  <footer>Cards are saved in this browser only.</footer>
+  <footer>Saved to your Supabase database.</footer>
 </main>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-const STORAGE_KEY = 'vokabelkarten-cards';
+const SUPABASE_URL = 'https://fthbysugxtuumkgsaful.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ0aGJ5c3VneHR1dW1rZ3NhZnVsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzMzc4NjksImV4cCI6MjA5NjkxMzg2OX0.wDI6EcWauFbTxQVnmoHXE7Y4xPO9EYUR_ZjZf-WkNH0';
+
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
 const DAY = 86400000;
 
-let cards = loadCards();
+let cards = [];
 let currentCard = null;
 let flipped = false;
 
-function loadCards() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch (e) {
+function now() { return Date.now(); }
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+function setStatus(msg, isError) {
+  const el = document.getElementById('statusLine');
+  el.textContent = msg || '';
+  el.classList.toggle('error', !!isError);
+}
+
+async function fetchCards() {
+  const { data, error } = await supabase.from('cards').select('*').order('due', { ascending: true });
+  if (error) {
+    setStatus('Could not load cards: ' + error.message, true);
     return [];
   }
+  return data;
 }
-
-function saveCards() {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(cards));
-  } catch (e) {}
-}
-
-function now() { return Date.now(); }
 
 function getDueCards() {
   return cards.filter(c => c.due <= now());
@@ -439,27 +465,38 @@ function pickCard() {
   return due[Math.floor(Math.random() * due.length)];
 }
 
-function escapeHtml(s) {
-  return s.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-}
-
-function addCard(front, back) {
-  cards.push({ id: Date.now() + Math.random(), front, back, interval: 0, due: now(), reps: 0 });
-  saveCards();
+async function addCard(front, back) {
+  const addBtn = document.getElementById('addBtn');
+  addBtn.disabled = true;
+  setStatus('Saving...');
+  const { data, error } = await supabase.from('cards').insert({
+    front, back, interval: 0, due: now(), reps: 0
+  }).select();
+  addBtn.disabled = false;
+  if (error) {
+    setStatus('Could not save: ' + error.message, true);
+    return;
+  }
+  cards.push(data[0]);
+  setStatus('Saved.');
   render();
 }
 
-function deleteCard(id) {
+async function deleteCard(id) {
+  const { error } = await supabase.from('cards').delete().eq('id', id);
+  if (error) {
+    setStatus('Could not delete: ' + error.message, true);
+    return;
+  }
   cards = cards.filter(c => String(c.id) !== String(id));
   if (currentCard && String(currentCard.id) === String(id)) {
     currentCard = null;
     flipped = false;
   }
-  saveCards();
   render();
 }
 
-function grade(card, quality) {
+async function grade(card, quality) {
   if (quality === 0) {
     card.interval = 0;
     card.due = now() + 10 * 60000;
@@ -473,7 +510,15 @@ function grade(card, quality) {
     card.interval = Math.max(1, Math.round(base));
     card.due = now() + card.interval * DAY;
   }
-  saveCards();
+
+  const { error } = await supabase.from('cards').update({
+    interval: card.interval, due: card.due, reps: card.reps
+  }).eq('id', card.id);
+
+  if (error) {
+    setStatus('Could not update: ' + error.message, true);
+  }
+
   flipped = false;
   currentCard = pickCard();
   render();
@@ -570,21 +615,25 @@ function render() {
   renderDeckList();
 }
 
-document.getElementById('addForm').addEventListener('submit', (e) => {
+document.getElementById('addForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const frontInput = document.getElementById('frontInput');
   const backInput = document.getElementById('backInput');
   const front = frontInput.value.trim();
   const back = backInput.value.trim();
   if (front && back) {
-    addCard(front, back);
+    await addCard(front, back);
     frontInput.value = '';
     backInput.value = '';
     frontInput.focus();
   }
 });
 
-render();
+(async function init() {
+  cards = await fetchCards();
+  render();
+  if (cards.length === 0) setStatus('');
+})();
 </script>
 </body>
 </html>
