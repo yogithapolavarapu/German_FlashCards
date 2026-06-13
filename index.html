@@ -241,6 +241,19 @@
     max-width: 90%;
   }
 
+  .face .note-tag {
+    font-size: 0.7rem;
+    font-family: 'Inter', sans-serif;
+    font-weight: 500;
+    color: var(--accent);
+    background: var(--accent-soft);
+    border-radius: 6px;
+    padding: 2px 8px;
+    margin-top: 8px;
+    max-width: 90%;
+    text-align: center;
+  }
+
   .face.back {
     transform: rotateY(180deg);
   }
@@ -808,6 +821,7 @@
     <button type="submit" id="addBtn">Add</button>
   </form>
   <input id="exampleInput" class="example-input" placeholder="Example sentence (optional)" autocomplete="off" />
+  <input id="notesInput" class="example-input" placeholder="Notes (e.g. die, plural: Häuser)" autocomplete="off" />
   <p class="status-line" id="statusLine"></p>
 
   <button class="section-toggle" id="deckToggle" type="button">
@@ -851,6 +865,8 @@
     <input id="editBack" autocomplete="off" />
     <label class="modal-label" for="editExample">Example sentence (optional)</label>
     <input id="editExample" autocomplete="off" placeholder="e.g. Ich trinke Wasser." />
+    <label class="modal-label" for="editNotes">Notes (optional)</label>
+    <input id="editNotes" autocomplete="off" placeholder="e.g. die, plural: Häuser" />
     <div class="modal-actions">
       <button id="editCancelBtn" type="button">Cancel</button>
       <button id="editSaveBtn" type="button" class="primary">Save</button>
@@ -978,12 +994,12 @@ function pickCard() {
   return cards.find(c => c.id === nextId) || null;
 }
 
-async function addCard(front, back, example) {
+async function addCard(front, back, example, notes) {
   const addBtn = document.getElementById('addBtn');
   addBtn.disabled = true;
   setStatus('Saving...');
   const { data, error } = await sb.from('cards').insert({
-    front, back, interval: 0, due: now(), reps: 0, profile, example: example || null
+    front, back, interval: 0, due: now(), reps: 0, profile, example: example || null, notes: notes || null
   }).select();
   addBtn.disabled = false;
   if (error) {
@@ -1016,6 +1032,7 @@ function openEditModal(card) {
   document.getElementById('editFront').value = card.front;
   document.getElementById('editBack').value = card.back;
   document.getElementById('editExample').value = card.example || '';
+  document.getElementById('editNotes').value = card.notes || '';
   document.getElementById('editOverlay').classList.remove('hidden');
 }
 
@@ -1029,8 +1046,9 @@ async function saveEditedCard() {
   const front = document.getElementById('editFront').value.trim();
   const back = document.getElementById('editBack').value.trim();
   const example = document.getElementById('editExample').value.trim();
+  const notes = document.getElementById('editNotes').value.trim();
   if (!front || !back) return;
-  const { error } = await sb.from('cards').update({ front, back, example: example || null }).eq('id', editingCard.id);
+  const { error } = await sb.from('cards').update({ front, back, example: example || null, notes: notes || null }).eq('id', editingCard.id);
   if (error) {
     setStatus('Could not save edit: ' + error.message, true);
     return;
@@ -1038,6 +1056,7 @@ async function saveEditedCard() {
   editingCard.front = front;
   editingCard.back = back;
   editingCard.example = example || null;
+  editingCard.notes = notes || null;
   closeEditModal();
   setStatus('Card updated.');
   render();
@@ -1144,6 +1163,7 @@ function renderCardZone() {
         <div class="face front">
           <p class="lang">German</p>
           <p class="word">${escapeHtml(c.front)}</p>
+          ${c.notes ? `<p class="note-tag">${escapeHtml(c.notes)}</p>` : ''}
           <p class="hint">Tap to reveal</p>
           <button class="icon-btn speak-btn" id="speakBtn" aria-label="Pronounce word" title="Pronounce">
             <i class="ti ti-volume" aria-hidden="true"></i>
@@ -1156,6 +1176,7 @@ function renderCardZone() {
           <p class="lang">English</p>
           <p class="word">${escapeHtml(c.back)}</p>
           ${c.example ? `<p class="example">${escapeHtml(c.example)}</p>` : ''}
+          ${c.notes ? `<p class="note-tag">${escapeHtml(c.notes)}</p>` : ''}
           <button class="icon-btn edit-btn" data-edit="back" aria-label="Edit card" title="Edit card">
             <i class="ti ti-edit" aria-hidden="true"></i>
           </button>
@@ -1247,14 +1268,17 @@ document.getElementById('addForm').addEventListener('submit', async (e) => {
   const frontInput = document.getElementById('frontInput');
   const backInput = document.getElementById('backInput');
   const exampleInput = document.getElementById('exampleInput');
+  const notesInput = document.getElementById('notesInput');
   const front = frontInput.value.trim();
   const back = backInput.value.trim();
   const example = exampleInput.value.trim();
+  const notes = notesInput.value.trim();
   if (front && back) {
-    await addCard(front, back, example);
+    await addCard(front, back, example, notes);
     frontInput.value = '';
     backInput.value = '';
     exampleInput.value = '';
+    notesInput.value = '';
     frontInput.focus();
   }
 });
