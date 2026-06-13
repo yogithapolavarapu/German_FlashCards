@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
 <style>
   :root {
     --bg: #F7F5F0;
@@ -291,6 +292,52 @@
     border-color: var(--gold);
   }
 
+  .toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 2rem;
+    font-size: 0.8rem;
+  }
+
+  .toolbar-label {
+    color: var(--ink-soft);
+    margin-right: 6px;
+  }
+
+  .toolbar-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .toolbar button {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 500;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--ink);
+    border-radius: 8px;
+    padding: 0.4rem 0.7rem;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+
+  .toolbar button:hover {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+  }
+
+  #shuffleBtn i {
+    font-size: 14px;
+    vertical-align: -2px;
+    margin-right: 4px;
+  }
+
   .add-form {
     display: flex;
     gap: 8px;
@@ -403,6 +450,18 @@
     <button data-q="3">Easy</button>
   </div>
 
+  <div class="toolbar">
+    <button id="shuffleBtn" title="Shuffle deck order">
+      <i class="ti ti-arrows-shuffle" aria-hidden="true"></i> Shuffle
+    </button>
+    <div class="toolbar-group">
+      <span class="toolbar-label">Send to deck:</span>
+      <button data-send="1">Hard</button>
+      <button data-send="2">Moderate</button>
+      <button data-send="3">Easy</button>
+    </div>
+  </div>
+
   <form class="add-form" id="addForm">
     <input id="frontInput" placeholder="German word" autocomplete="off" required />
     <input id="backInput" placeholder="English meaning" autocomplete="off" required />
@@ -426,6 +485,7 @@ let cards = [];
 let currentCard = null;
 let flipped = false;
 let practiceFilter = null;
+let dueQueue = [];
 
 function now() { return Date.now(); }
 
@@ -456,10 +516,26 @@ function getPracticedCards() {
   return cards.filter(c => c.reps > 0);
 }
 
+function shuffleArray(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
 function pickCard() {
   const due = getDueCards();
-  if (due.length === 0) return null;
-  return due[Math.floor(Math.random() * due.length)];
+  if (due.length === 0) {
+    dueQueue = [];
+    return null;
+  }
+  dueQueue = dueQueue.filter(id => due.some(c => c.id === id));
+  due.forEach(c => { if (!dueQueue.includes(c.id)) dueQueue.push(c.id); });
+  if (dueQueue.length === 0) return null;
+  const nextId = dueQueue[0];
+  return cards.find(c => c.id === nextId) || null;
 }
 
 async function addCard(front, back) {
@@ -513,10 +589,11 @@ async function grade(card, quality) {
   }
 
   flipped = false;
+  dueQueue = dueQueue.filter(id => id !== card.id);
   currentCard = pickCard();
-  if (!currentCard && practiceFilter !== null && cards.length > 0) {
+  if (!currentCard && practiceFilter !== null) {
     const pool = cards.filter(c => c.lastQuality === practiceFilter);
-    currentCard = pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : cards[Math.floor(Math.random() * cards.length)];
+    currentCard = pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : null;
   }
   render();
 }
@@ -537,7 +614,29 @@ function renderCardZone() {
   if (!currentCard) {
     if (practiceFilter !== null) {
       const pool = cards.filter(c => c.lastQuality === practiceFilter);
-      currentCard = pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : cards[Math.floor(Math.random() * cards.length)];
+      if (pool.length > 0) {
+        currentCard = pool[Math.floor(Math.random() * pool.length)];
+      } else {
+        const labels = { 1: 'Hard', 2: 'Moderate', 3: 'Easy' };
+        const remaining = [1, 2, 3].filter(q => q !== practiceFilter);
+        zone.innerHTML = `
+          <div class="empty-state">
+            <p style="margin:0 0 12px;">Nothing marked as ${labels[practiceFilter]}. Try another:</p>
+            <div class="practice-filters">
+              ${remaining.map(q => `<button data-pf="${q}">${labels[q]}</button>`).join('')}
+            </div>
+          </div>
+        `;
+        gradeRow.classList.add('hidden');
+        zone.querySelectorAll('.practice-filters button').forEach(b => {
+          b.onclick = () => {
+            practiceFilter = parseInt(b.dataset.pf, 10);
+            flipped = false;
+            render();
+          };
+        });
+        return;
+      }
     } else {
       zone.innerHTML = `
         <div class="empty-state">
@@ -554,8 +653,7 @@ function renderCardZone() {
         b.onclick = () => {
           practiceFilter = parseInt(b.dataset.pf, 10);
           flipped = false;
-          const pool = cards.filter(c => c.lastQuality === practiceFilter);
-          currentCard = pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : cards[Math.floor(Math.random() * cards.length)];
+          currentCard = null;
           render();
         };
       });
@@ -618,6 +716,48 @@ document.getElementById('addForm').addEventListener('submit', async (e) => {
     backInput.value = '';
     frontInput.focus();
   }
+});
+
+document.getElementById('shuffleBtn').addEventListener('click', () => {
+  if (dueQueue.length > 1) {
+    dueQueue = shuffleArray(dueQueue);
+    flipped = false;
+    currentCard = cards.find(c => c.id === dueQueue[0]) || null;
+  } else if (cards.length > 0) {
+    flipped = false;
+    currentCard = cards[Math.floor(Math.random() * cards.length)];
+  }
+  render();
+});
+
+document.querySelectorAll('.toolbar-group button[data-send]').forEach(b => {
+  b.addEventListener('click', async () => {
+    const quality = parseInt(b.dataset.send, 10);
+    const toSend = cards.filter(c => c.lastQuality === quality);
+    if (toSend.length === 0) {
+      setStatus('No cards marked as ' + b.textContent.trim() + '.');
+      return;
+    }
+    setStatus('Sending cards back to deck...');
+    for (const c of toSend) {
+      c.interval = 0;
+      c.due = now();
+      c.reps = 0;
+      c.lastQuality = null;
+      const { error } = await sb.from('cards').update({
+        interval: 0, due: c.due, reps: 0
+      }).eq('id', c.id);
+      if (error) {
+        setStatus('Could not update: ' + error.message, true);
+        return;
+      }
+    }
+    setStatus(toSend.length + ' card(s) sent back to deck.');
+    flipped = false;
+    practiceFilter = null;
+    currentCard = pickCard();
+    render();
+  });
 });
 
 function applyTheme(theme) {
