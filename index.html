@@ -1176,6 +1176,7 @@ function renderCardZone() {
           <p class="word">${escapeHtml(c.back)}</p>
           ${c.example ? `<p class="example">${escapeHtml(c.example)}</p>` : ''}
           ${c.notes ? `<p class="note-tag">${escapeHtml(c.notes)}</p>` : ''}
+          <p class="hint">Tap to flip back</p>
           <button class="icon-btn edit-btn" data-edit="back" aria-label="Edit card" title="Edit card">
             <i class="ti ti-edit" aria-hidden="true"></i>
           </button>
@@ -1197,10 +1198,8 @@ function renderCardZone() {
   });
 
   document.getElementById('flipCard').addEventListener('click', () => {
-    if (!flipped) {
-      flipped = true;
-      render();
-    }
+    flipped = !flipped;
+    render();
   });
 
   if (flipped) {
