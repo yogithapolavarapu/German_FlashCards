@@ -171,7 +171,7 @@
 
   .card-zone {
     perspective: 1200px;
-    margin-bottom: 1.5rem;
+    margin-bottom: 1rem;
     min-height: 180px;
   }
 
@@ -319,7 +319,7 @@
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 8px;
-    margin-bottom: 2rem;
+    margin-bottom: 0.75rem;
     height: 44px;
   }
 
@@ -355,7 +355,7 @@
     justify-content: space-between;
     flex-wrap: wrap;
     gap: 8px;
-    margin-bottom: 2rem;
+    margin-bottom: 1.25rem;
     font-size: 0.8rem;
   }
 
@@ -839,7 +839,6 @@
     <input id="newProfileInput" autocomplete="off" placeholder="Your name" />
     <label class="modal-label">Pick an avatar</label>
     <div class="avatar-picker" id="emojiPicker"></div>
-    <div class="avatar-picker" id="colorPicker"></div>
     <div class="modal-actions">
       <button id="profileGoBtn" type="button" class="primary">Continue</button>
     </div>
@@ -1473,10 +1472,8 @@ document.getElementById('editOverlay').addEventListener('click', (e) => {
 });
 
 const EMOJI_OPTIONS = ['🦊','🐻','🐱','🐶','🦉','🐢','🐸','🦁','🐼','🐧','🦄','🐝'];
-const COLOR_OPTIONS = ['#3A5A78','#C99A3B','#B5564A','#5B8BAE','#7DD3A8','#9C6ADE','#E07A5F','#4A9D8A'];
 
 let selectedEmoji = EMOJI_OPTIONS[0];
-let selectedColor = COLOR_OPTIONS[0];
 
 function renderAvatarPickers() {
   const emojiEl = document.getElementById('emojiPicker');
@@ -1489,34 +1486,22 @@ function renderAvatarPickers() {
       renderAvatarPickers();
     });
   });
-
-  const colorEl = document.getElementById('colorPicker');
-  colorEl.innerHTML = COLOR_OPTIONS.map(c =>
-    `<button type="button" data-color="${c}" style="background:${c};" class="${c === selectedColor ? 'selected' : ''}"></button>`
-  ).join('');
-  colorEl.querySelectorAll('button').forEach(b => {
-    b.addEventListener('click', () => {
-      selectedColor = b.dataset.color;
-      renderAvatarPickers();
-    });
-  });
 }
 
-function avatarChip(emoji, color) {
-  return `<span class="avatar-chip" style="background:${color || 'var(--accent-soft)'};">${emoji || ''}</span>`;
+function avatarChip(emoji) {
+  return `<span class="avatar-chip" style="background:var(--accent-soft);">${emoji || ''}</span>`;
 }
 
 async function fetchKnownProfiles() {
   const { data: cardRows, error: cardErr } = await sb.from('cards').select('profile');
-  const { data: streakRows } = await sb.from('streaks').select('profile, avatar_emoji, avatar_color');
+  const { data: streakRows } = await sb.from('streaks').select('profile, avatar_emoji');
   if (cardErr || !cardRows) return [];
   const names = new Set(cardRows.map(r => r.profile).filter(Boolean));
   const avatarMap = {};
   (streakRows || []).forEach(r => { avatarMap[r.profile] = r; });
   return Array.from(names).map(n => ({
     name: n,
-    emoji: avatarMap[n] ? avatarMap[n].avatar_emoji : null,
-    color: avatarMap[n] ? avatarMap[n].avatar_color : null
+    emoji: avatarMap[n] ? avatarMap[n].avatar_emoji : null
   }));
 }
 
@@ -1528,7 +1513,7 @@ async function showProfilePicker() {
     list.innerHTML = '<p style="font-size:0.85rem; color: var(--ink-soft); margin:0;">No profiles yet — add the first name below.</p>';
   } else {
     list.innerHTML = known.map(p =>
-      `<button data-profile="${escapeHtml(p.name)}">${avatarChip(p.emoji, p.color)}${escapeHtml(p.name)}</button>`
+      `<button data-profile="${escapeHtml(p.name)}">${avatarChip(p.emoji)}${escapeHtml(p.name)}</button>`
     ).join('');
     list.querySelectorAll('button').forEach(b => {
       b.addEventListener('click', () => selectProfile(b.dataset.profile));
@@ -1538,7 +1523,7 @@ async function showProfilePicker() {
   overlay.classList.remove('hidden');
 }
 
-let currentAvatar = { emoji: null, color: null };
+let currentAvatar = { emoji: null };
 
 async function selectProfile(name) {
   name = name.trim();
@@ -1550,13 +1535,13 @@ async function selectProfile(name) {
   cards = await fetchCards();
   await fetchStreak();
   if (isNew) {
-    currentAvatar = { emoji: selectedEmoji, color: selectedColor };
-    await sb.from('streaks').upsert({ profile, avatar_emoji: selectedEmoji, avatar_color: selectedColor });
+    currentAvatar = { emoji: selectedEmoji };
+    await sb.from('streaks').upsert({ profile, avatar_emoji: selectedEmoji });
   } else {
-    const { data } = await sb.from('streaks').select('avatar_emoji, avatar_color').eq('profile', profile).maybeSingle();
-    currentAvatar = { emoji: data ? data.avatar_emoji : null, color: data ? data.avatar_color : null };
+    const { data } = await sb.from('streaks').select('avatar_emoji').eq('profile', profile).maybeSingle();
+    currentAvatar = { emoji: data ? data.avatar_emoji : null };
   }
-  document.getElementById('profileLabel').innerHTML = avatarChip(currentAvatar.emoji, currentAvatar.color) + escapeHtml(profile);
+  document.getElementById('profileLabel').innerHTML = avatarChip(currentAvatar.emoji) + escapeHtml(profile);
   practiceFilter = null;
   dueQueue = [];
   currentCard = null;
