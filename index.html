@@ -597,34 +597,78 @@
     padding: 1rem;
   }
 
-  .progress-wrap {
+  .heatmap-wrap {
     padding: 0.75rem 0 1rem;
+    overflow-x: auto;
   }
 
-  .progress-label {
-    font-size: 0.85rem;
+  .heatmap-months {
+    display: flex;
+    gap: 0;
+    margin-bottom: 4px;
+    padding-left: 0;
+  }
+
+  .heatmap-month-label {
+    font-size: 0.7rem;
     color: var(--ink-soft);
-    margin-bottom: 0.6rem;
+    flex-shrink: 0;
   }
 
-  .progress-label span {
-    color: var(--ink);
-    font-weight: 500;
+  .heatmap-grid {
+    display: flex;
+    gap: 3px;
   }
 
-  .progress-bar-bg {
-    width: 100%;
-    height: 10px;
+  .heatmap-week {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .heatmap-day {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
     background: var(--border);
-    border-radius: 999px;
-    overflow: hidden;
+    cursor: default;
+    position: relative;
   }
 
-  .progress-bar-fill {
-    height: 100%;
-    background: var(--accent);
-    border-radius: 999px;
-    transition: width 0.4s ease;
+  .heatmap-day[data-count="0"] { background: var(--border); }
+  .heatmap-day[data-level="1"] { background: var(--accent-soft); border: 1px solid var(--accent); }
+  .heatmap-day[data-level="2"] { background: var(--accent); opacity: 0.5; }
+  .heatmap-day[data-level="3"] { background: var(--accent); }
+
+  .heatmap-day:hover::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--ink);
+    color: var(--bg);
+    font-size: 0.7rem;
+    padding: 3px 6px;
+    border-radius: 4px;
+    white-space: nowrap;
+    z-index: 10;
+    pointer-events: none;
+  }
+
+  .heatmap-legend {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 8px;
+    font-size: 0.7rem;
+    color: var(--ink-soft);
+  }
+
+  .legend-box {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
   }
 
   .modal-overlay {
@@ -863,15 +907,19 @@
   </div>
 
   <button class="section-toggle" id="chartToggle" type="button">
-    <i class="ti ti-chevron-down" aria-hidden="true"></i> Today's progress
+    <i class="ti ti-chevron-down" aria-hidden="true"></i> Activity
   </button>
   <div class="deck-section hidden" id="chartSection">
-    <div class="progress-wrap">
-      <div class="progress-label">
-        <span id="progressText">0 of 0 cards practiced today</span>
-      </div>
-      <div class="progress-bar-bg">
-        <div class="progress-bar-fill" id="progressFill" style="width:0%"></div>
+    <div class="heatmap-wrap">
+      <div class="heatmap-months" id="heatmapMonths"></div>
+      <div class="heatmap-grid" id="heatmapGrid"></div>
+      <div class="heatmap-legend">
+        <span>Less</span>
+        <div class="legend-box" style="background:var(--border)"></div>
+        <div class="legend-box" style="background:var(--accent-soft)"></div>
+        <div class="legend-box" style="background:var(--accent); opacity:0.5"></div>
+        <div class="legend-box" style="background:var(--accent)"></div>
+        <span>More</span>
       </div>
     </div>
   </div>
@@ -961,10 +1009,7 @@ async function fetchStreak() {
   const { data, error } = await sb.from('streaks').select('*').eq('profile', profile).maybeSingle();
   if (error) return;
   streakValue = data ? (data.current_streak || 0) : 0;
-  const today = todayStr();
-  practicedToday = (data && data.last_practiced_date === today) ? (data.practiced_today || 0) : 0;
   document.getElementById('streakCount').textContent = streakValue;
-  renderProgress();
 }
 
 async function recordPracticeToday() {
@@ -972,22 +1017,18 @@ async function recordPracticeToday() {
   const today = todayStr();
   const last = data ? data.last_practiced_date : null;
   let nextStreak = data ? (data.current_streak || 0) : 0;
-  let nextPracticedToday = (last === today) ? (data.practiced_today || 0) + 1 : 1;
-  if (last !== today) {
-    if (last && daysBetween(last, today) === 1) {
-      nextStreak = nextStreak + 1;
-    } else {
-      nextStreak = 1;
-    }
+  if (last === today) return;
+  if (last && daysBetween(last, today) === 1) {
+    nextStreak = nextStreak + 1;
+  } else {
+    nextStreak = 1;
   }
   const { error: updErr } = await sb.from('streaks').upsert({
-    profile, current_streak: nextStreak, last_practiced_date: today, practiced_today: nextPracticedToday
+    profile, current_streak: nextStreak, last_practiced_date: today
   });
   if (!updErr) {
     streakValue = nextStreak;
-    practicedToday = nextPracticedToday;
     document.getElementById('streakCount').textContent = streakValue;
-    renderProgress();
   }
 }
 
@@ -1124,6 +1165,7 @@ async function grade(card, quality) {
   }
 
   recordPracticeToday();
+  recordActivity();
 
   flipped = false;
   dueQueue = dueQueue.filter(id => id !== card.id);
@@ -1262,7 +1304,8 @@ function render() {
   document.getElementById('totalCount').textContent = cards.length;
   renderCardZone();
   renderDeckList();
-  renderProgress();
+  const chartSection = document.getElementById('chartSection');
+  if (chartSection && !chartSection.classList.contains('hidden')) renderHeatmap();
 }
 
 function renderDeckList() {
@@ -1412,19 +1455,102 @@ function setupSectionToggle(toggleId, sectionId, onOpen) {
 }
 
 setupSectionToggle('deckToggle', 'deckSection', renderDeckList);
-setupSectionToggle('chartToggle', 'chartSection', renderProgress);
+setupSectionToggle('chartToggle', 'chartSection', renderHeatmap);
 
 document.getElementById('deckSearch').addEventListener('input', renderDeckList);
 
-let practicedToday = 0;
+let activityData = {};
 
-function renderProgress() {
-  const total = cards.length;
-  const pct = total > 0 ? Math.min(100, Math.round((practicedToday / total) * 100)) : 0;
-  const fill = document.getElementById('progressFill');
-  const text = document.getElementById('progressText');
-  if (fill) fill.style.width = pct + '%';
-  if (text) text.textContent = `${practicedToday} of ${total} cards practiced today`;
+async function fetchActivity() {
+  const since = new Date();
+  since.setDate(since.getDate() - 105); // ~15 weeks
+  const sinceStr = since.toISOString().split('T')[0];
+  const { data, error } = await sb.from('activity').select('date, count').eq('profile', profile).gte('date', sinceStr);
+  if (error) return;
+  activityData = {};
+  (data || []).forEach(r => { activityData[r.date] = r.count; });
+}
+
+async function recordActivity() {
+  const today = todayStr();
+  const current = activityData[today] || 0;
+  const next = current + 1;
+  const { error } = await sb.from('activity').upsert({ profile, date: today, count: next });
+  if (!error) {
+    activityData[today] = next;
+    const chartSection = document.getElementById('chartSection');
+    if (chartSection && !chartSection.classList.contains('hidden')) renderHeatmap();
+  }
+}
+
+function renderHeatmap() {
+  const grid = document.getElementById('heatmapGrid');
+  const monthsEl = document.getElementById('heatmapMonths');
+  if (!grid) return;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const dayOfWeek = today.getDay(); // 0=Sun
+  const totalWeeks = 15;
+  const totalDays = totalWeeks * 7;
+
+  // Start from Sunday of the earliest week
+  const start = new Date(today);
+  start.setDate(start.getDate() - (totalDays - 1) + (6 - dayOfWeek));
+  // Actually align to start of week (Sunday)
+  const startAdj = new Date(today);
+  startAdj.setDate(startAdj.getDate() - (totalDays - 1 + dayOfWeek));
+
+  const maxCount = Math.max(1, ...Object.values(activityData));
+
+  let weeks = [];
+  let currentWeek = [];
+  let monthLabels = [];
+  let lastMonth = -1;
+  let weekIndex = 0;
+
+  for (let i = 0; i < totalDays; i++) {
+    const d = new Date(startAdj);
+    d.setDate(d.getDate() + i);
+    const dateStr = d.toISOString().split('T')[0];
+    const count = activityData[dateStr] || 0;
+    const level = count === 0 ? 0 : count <= maxCount * 0.33 ? 1 : count <= maxCount * 0.66 ? 2 : 3;
+    const month = d.getMonth();
+    const label = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    const tip = count > 0 ? `${label}: ${count} card${count !== 1 ? 's' : ''}` : label;
+
+    if (d.getDay() === 0 && currentWeek.length > 0) {
+      weeks.push(currentWeek);
+      currentWeek = [];
+      weekIndex++;
+    }
+
+    if (month !== lastMonth && d <= today) {
+      monthLabels.push({ weekIndex, label: d.toLocaleDateString(undefined, { month: 'short' }) });
+      lastMonth = month;
+    }
+
+    const isFuture = d > today;
+    currentWeek.push({ dateStr, count, level, tip, isFuture });
+  }
+  if (currentWeek.length > 0) weeks.push(currentWeek);
+
+  grid.innerHTML = weeks.map(week => `
+    <div class="heatmap-week">
+      ${week.map(day => day.isFuture
+        ? `<div class="heatmap-day" style="opacity:0.2"></div>`
+        : `<div class="heatmap-day" data-count="${day.count}" data-level="${day.level}" data-tip="${day.tip}"></div>`
+      ).join('')}
+    </div>
+  `).join('');
+
+  // Month labels
+  const weekWidth = 15; // 12px cell + 3px gap
+  monthsEl.innerHTML = monthLabels.map((m, i) => {
+    const nextX = i + 1 < monthLabels.length ? monthLabels[i + 1].weekIndex * weekWidth : weeks.length * weekWidth;
+    const width = nextX - m.weekIndex * weekWidth;
+    return `<div class="heatmap-month-label" style="width:${width}px;">${m.label}</div>`;
+  }).join('');
 }
 
 document.getElementById('editCancelBtn').addEventListener('click', closeEditModal);
@@ -1496,6 +1622,7 @@ async function selectProfile(name) {
   document.getElementById('profileOverlay').classList.add('hidden');
   cards = await fetchCards();
   await fetchStreak();
+  await fetchActivity();
   if (isNew) {
     currentAvatar = { emoji: selectedEmoji };
     await sb.from('streaks').upsert({ profile, avatar_emoji: selectedEmoji });
