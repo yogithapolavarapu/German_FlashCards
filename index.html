@@ -282,88 +282,6 @@
     color: var(--red);
   }
 
-  .deck-header {
-    font-size: 0.8rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--ink-soft);
-    margin: 0 0 0.75rem;
-  }
-
-  .deck-list {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
-
-  .deck-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 0.6rem 0.85rem;
-    font-size: 0.85rem;
-  }
-
-  .deck-item .pair {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    padding-right: 8px;
-  }
-
-  .deck-item .pair .de {
-    font-family: 'JetBrains Mono', monospace;
-    font-weight: 700;
-  }
-
-  .deck-item .pair .en {
-    color: var(--ink-soft);
-  }
-
-  .deck-item .meta {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-shrink: 0;
-  }
-
-  .deck-item .due-tag {
-    font-size: 0.7rem;
-    font-family: 'JetBrains Mono', monospace;
-    color: var(--ink-soft);
-    white-space: nowrap;
-  }
-
-  .deck-item .due-tag.now {
-    color: var(--accent);
-  }
-
-  .deck-item .del {
-    background: none;
-    border: none;
-    cursor: pointer;
-    color: var(--ink-soft);
-    font-size: 1rem;
-    padding: 2px;
-    line-height: 1;
-  }
-
-  .deck-item .del:hover {
-    color: var(--red);
-  }
-
-  .empty-deck {
-    text-align: center;
-    color: var(--ink-soft);
-    font-size: 0.85rem;
-    padding: 1rem;
-    border: 1px dashed var(--border);
-    border-radius: 8px;
-  }
-
   footer {
     margin-top: 2.5rem;
     text-align: center;
@@ -387,11 +305,11 @@
 
   <div class="stats">
     <div class="stat due">
-      <p class="stat-label">Due now</p>
+      <p class="stat-label">Practiced</p>
       <p class="stat-value" id="dueCount">0</p>
     </div>
     <div class="stat">
-      <p class="stat-label">Total cards</p>
+      <p class="stat-label">Deck</p>
       <p class="stat-value" id="totalCount">0</p>
     </div>
   </div>
@@ -412,11 +330,6 @@
     <button type="submit" id="addBtn">Add</button>
   </form>
   <p class="status-line" id="statusLine"></p>
-
-  <p class="deck-header">Your deck</p>
-  <div class="deck-list" id="deckList">
-    <div class="empty-deck">Loading&hellip;</div>
-  </div>
 
   <footer>Saved to your Supabase database.</footer>
 </main>
@@ -457,6 +370,10 @@ async function fetchCards() {
 
 function getDueCards() {
   return cards.filter(c => c.due <= now());
+}
+
+function getPracticedCards() {
+  return cards.filter(c => c.reps > 0);
 }
 
 function pickCard() {
@@ -529,7 +446,7 @@ function renderCardZone() {
   const gradeRow = document.getElementById('gradeRow');
 
   if (cards.length === 0) {
-    zone.innerHTML = '<div class="empty-state">Add your first word below to start your deck.</div>';
+    zone.innerHTML = '<div class="empty-state">You haven\'t added anything yet. Start now to practice.</div>';
     gradeRow.classList.add('hidden');
     return;
   }
@@ -579,40 +496,10 @@ function renderCardZone() {
   }
 }
 
-function renderDeckList() {
-  const list = document.getElementById('deckList');
-  if (cards.length === 0) {
-    list.innerHTML = '<div class="empty-deck">No cards yet.</div>';
-    return;
-  }
-  const sorted = [...cards].sort((a, b) => a.due - b.due);
-  list.innerHTML = sorted.map(c => {
-    const isDue = c.due <= now();
-    const tag = isDue ? 'due' : 'in ' + Math.max(1, Math.ceil((c.due - now()) / DAY)) + 'd';
-    return `
-      <div class="deck-item">
-        <div class="pair">
-          <span class="de">${escapeHtml(c.front)}</span>
-          <span class="en"> — ${escapeHtml(c.back)}</span>
-        </div>
-        <div class="meta">
-          <span class="due-tag ${isDue ? 'now' : ''}">${tag}</span>
-          <button class="del" data-id="${c.id}" aria-label="Delete card">&times;</button>
-        </div>
-      </div>
-    `;
-  }).join('');
-
-  list.querySelectorAll('.del').forEach(b => {
-    b.onclick = () => deleteCard(b.dataset.id);
-  });
-}
-
 function render() {
-  document.getElementById('dueCount').textContent = getDueCards().length;
+  document.getElementById('dueCount').textContent = getPracticedCards().length;
   document.getElementById('totalCount').textContent = cards.length;
   renderCardZone();
-  renderDeckList();
 }
 
 document.getElementById('addForm').addEventListener('submit', async (e) => {
