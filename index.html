@@ -1266,6 +1266,16 @@ function pickCard() {
 }
 
 async function addCard(front, back, example, notes) {
+  const duplicate = cards.find(c =>
+    c.front.trim().toLowerCase() === front.trim().toLowerCase() &&
+    c.back.trim().toLowerCase() === back.trim().toLowerCase()
+  );
+  if (duplicate) {
+    const addBtn = document.getElementById('addBtn');
+    addBtn.disabled = false;
+    setStatus(`"${front}" already exists in your deck.`, true);
+    return;
+  }
   const addBtn = document.getElementById('addBtn');
   addBtn.disabled = true;
   setStatus('Saving...');
