@@ -1715,7 +1715,7 @@ function renderCardZone() {
   zone.innerHTML = `
     <div class="flip-card ${flipped ? 'flipped' : ''}" id="flipCard">
       <div class="flip-inner">
-        <div class="face front" style="position:relative;">
+        <div class="face front">
           ${masteredBadge}
           <p class="lang">${frontLang}</p>
           <p class="word">${escapeHtml(frontWord)}</p>
@@ -1727,7 +1727,7 @@ function renderCardZone() {
             <i class="ti ti-edit" aria-hidden="true"></i>
           </button>
         </div>
-        <div class="face back" style="position:relative;">
+        <div class="face back">
           ${masteredBadge}
           <p class="lang">${backLang}</p>
           <p class="word">${escapeHtml(backWord)}</p>
