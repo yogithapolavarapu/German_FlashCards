@@ -1954,7 +1954,14 @@ async function fetchAllCards() {
 async function startQuizSizePicker() {
   if (cards.length < 4) { setStatus('Need at least 4 cards to quiz.'); return; }
   await fetchAllCards();
-  const hasCombined = allCards.length > cards.length && allCards.length >= 4;
+  const seenAll = new Set();
+  const uniqueAll = allCards.filter(c => {
+    const key = c.front.trim().toLowerCase() + '|' + c.back.trim().toLowerCase();
+    if (seenAll.has(key)) return false;
+    seenAll.add(key);
+    return true;
+  });
+  const hasCombined = uniqueAll.length > cards.length && uniqueAll.length >= 4;
   const sizePicker = document.getElementById('quizSizePicker');
   const cardArea = document.getElementById('quizCardArea');
   const sizeOptions = document.getElementById('quizSizeOptions');
@@ -1964,9 +1971,9 @@ async function startQuizSizePicker() {
     .map(s => `<button class="quiz-option" data-size="${s}" data-pool="mine">${s === cards.length ? `My full deck (${s})` : `${s} from my deck`}</button>`);
 
   const combinedOptions = hasCombined
-    ? [10, 25, allCards.length]
-        .filter((v, i, a) => a.indexOf(v) === i && v <= allCards.length)
-        .map(s => `<button class="quiz-option" data-size="${s}" data-pool="all" style="border-color:var(--gold);">${s === allCards.length ? `Everyone's full deck (${s})` : `${s} from everyone's deck`}</button>`)
+    ? [10, 25, uniqueAll.length]
+        .filter((v, i, a) => a.indexOf(v) === i && v <= uniqueAll.length)
+        .map(s => `<button class="quiz-option" data-size="${s}" data-pool="all" style="border-color:var(--gold);">${s === uniqueAll.length ? `Everyone's deck (${s} unique)` : `${s} from everyone's deck`}</button>`)
     : [];
 
   sizeOptions.innerHTML = [...myOptions, ...combinedOptions].join('');
