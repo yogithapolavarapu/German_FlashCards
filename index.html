@@ -72,47 +72,6 @@
     flex-shrink: 0;
   }
 
-  .challenge-banner {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    background: var(--gold-soft);
-    border: 1px solid var(--gold);
-    border-radius: 10px;
-    padding: 0.6rem 0.85rem;
-    font-size: 0.85rem;
-    color: var(--ink);
-    margin-bottom: 1.25rem;
-  }
-
-  .challenge-banner.hidden { display: none; }
-
-  .challenge-banner span { flex: 1; }
-
-  .challenge-banner button {
-    font-family: 'Inter', sans-serif;
-    font-size: 0.8rem;
-    font-weight: 600;
-    border: none;
-    border-radius: 6px;
-    padding: 4px 10px;
-    cursor: pointer;
-  }
-
-  #challengeBannerBtn {
-    background: var(--gold);
-    color: #fff;
-  }
-
-  #challengeBannerDismiss {
-    background: none;
-    color: var(--ink-soft);
-    font-size: 1rem;
-    padding: 2px 6px;
-  }
-
-  #challengeBannerDismiss:hover { color: var(--ink); }
-
   #themeToggle {
     background: var(--card);
     border: 1px solid var(--border);
@@ -1003,12 +962,8 @@
     </div>
   </header>
 
-  <div class="challenge-banner hidden" id="challengeBanner">
-    <span id="challengeBannerText">🎯 You have a challenge waiting!</span>
-    <button id="challengeBannerBtn">View</button>
-    <button id="challengeBannerNext" style="display:none;">Next</button>
-    <button id="challengeBannerDismiss" aria-label="Dismiss">&times;</button>
-  </div>
+
+
 
   <div class="stats">
     <div class="stat due">
@@ -1035,8 +990,9 @@
     <button id="quizBtn" title="Quiz mode">
       <i class="ti ti-help" aria-hidden="true"></i> Quiz
     </button>
-    <button id="challengeBtn" title="Challenge a friend">
+    <button id="challengeBtn" title="Challenge a friend" style="position:relative;">
       <i class="ti ti-bolt" aria-hidden="true"></i> Challenge
+      <span id="challengeBadge" style="display:none;position:absolute;top:-6px;right:-6px;background:var(--red);color:#fff;font-size:10px;font-weight:700;border-radius:999px;min-width:16px;height:16px;line-height:16px;text-align:center;padding:0 3px;"></span>
     </button>
   </div>
 
@@ -1837,6 +1793,45 @@ function openChallengePicker(specificCard) {
   if (specificCard instanceof Event) specificCard = null;
   const overlay = document.getElementById('challengeOverlay');
   const body = document.getElementById('challengeBody');
+
+  // If there are pending challenges and no specific card, show accept/challenge menu
+  if (!specificCard && pendingChallenges.length > 0) {
+    document.getElementById('challengeTitle').textContent = 'Challenge';
+    body.innerHTML = `
+      ${pendingChallenges.length > 0 ? `
+        <p style="font-size:0.85rem;color:var(--ink-soft);margin:0 0 6px;">Pending challenges:</p>
+        <div class="challenge-profile-list" id="pendingList">
+          ${pendingChallenges.map((c, i) => `
+            <button data-index="${i}">🎯 ${escapeHtml(c.created_by)} ${c.cards ? `— <em>${escapeHtml(c.cards.front)}</em>` : ''}</button>
+          `).join('')}
+        </div>
+        <hr style="border:none;border-top:1px solid var(--border);margin:0.75rem 0;">
+      ` : ''}
+      <button id="challengeSomeoneBtn" style="width:100%;font-family:'Inter',sans-serif;font-size:0.9rem;font-weight:500;text-align:left;border:1px solid var(--border);background:var(--bg);color:var(--ink);border-radius:8px;padding:0.6rem 0.85rem;cursor:pointer;">⚡ Challenge someone</button>
+    `;
+    body.querySelectorAll('#pendingList button').forEach(b => {
+      b.addEventListener('click', async () => {
+        const idx = parseInt(b.dataset.index);
+        const c = pendingChallenges[idx];
+        pendingChallenges.splice(idx, 1);
+        updateChallengeBadge();
+        overlay.classList.add('hidden');
+        await showOpponentChallenge(c);
+      });
+    });
+    document.getElementById('challengeSomeoneBtn').addEventListener('click', () => {
+      showChallengeSomeonePicker(null);
+    });
+    overlay.classList.remove('hidden');
+    return;
+  }
+
+  showChallengeSomeonePicker(specificCard);
+}
+
+function showChallengeSomeonePicker(specificCard) {
+  const overlay = document.getElementById('challengeOverlay');
+  const body = document.getElementById('challengeBody');
   document.getElementById('challengeTitle').textContent = 'Challenge a friend';
   fetchOtherProfiles().then(others => {
     if (others.length === 0) {
@@ -1942,20 +1937,14 @@ async function showChallengeResult(challenge, card) {
 let pendingChallenges = [];
 let pendingChallengeIndex = 0;
 
-function updateChallengeBanner() {
-  const banner = document.getElementById('challengeBanner');
-  const text = document.getElementById('challengeBannerText');
-  const nextBtn = document.getElementById('challengeBannerNext');
-  if (pendingChallenges.length === 0) {
-    banner.classList.add('hidden');
-    return;
+function updateChallengeBadge() {
+  const badge = document.getElementById('challengeBadge');
+  if (pendingChallenges.length > 0) {
+    badge.textContent = pendingChallenges.length;
+    badge.style.display = 'inline-block';
+  } else {
+    badge.style.display = 'none';
   }
-  const c = pendingChallenges[pendingChallengeIndex];
-  const total = pendingChallenges.length;
-  const countStr = total > 1 ? ` (${pendingChallengeIndex + 1}/${total})` : '';
-  text.textContent = `🎯 ${c.created_by} challenges you!${countStr}`;
-  nextBtn.style.display = total > 1 ? 'inline-block' : 'none';
-  banner.classList.remove('hidden');
 }
 
 async function addPendingChallenge(data) {
@@ -1963,17 +1952,10 @@ async function addPendingChallenge(data) {
     const { data: cardData } = await sb.from('cards').select('*').eq('id', data.card_id).single();
     data.cards = cardData;
   }
-  // avoid duplicates
   if (!pendingChallenges.find(c => c.id === data.id)) {
     pendingChallenges.push(data);
   }
-  updateChallengeBanner();
-}
-
-function hideChallengeBanner() {
-  pendingChallenges = [];
-  pendingChallengeIndex = 0;
-  document.getElementById('challengeBanner').classList.add('hidden');
+  updateChallengeBadge();
 }
 
 async function checkPendingChallenge() {
@@ -1997,23 +1979,6 @@ function subscribeIncomingChallenges() {
     })
     .subscribe();
 }
-
-document.getElementById('challengeBannerBtn').addEventListener('click', async () => {
-  const c = pendingChallenges[pendingChallengeIndex];
-  if (c) {
-    pendingChallenges.splice(pendingChallengeIndex, 1);
-    pendingChallengeIndex = Math.min(pendingChallengeIndex, pendingChallenges.length - 1);
-    updateChallengeBanner();
-    await showOpponentChallenge(c);
-  }
-});
-
-document.getElementById('challengeBannerNext').addEventListener('click', () => {
-  pendingChallengeIndex = (pendingChallengeIndex + 1) % pendingChallenges.length;
-  updateChallengeBanner();
-});
-
-document.getElementById('challengeBannerDismiss').addEventListener('click', hideChallengeBanner);
 
 async function showOpponentChallenge(challenge) {
   // Fetch the card directly since join may not resolve
