@@ -200,13 +200,13 @@
   .card-zone {
     perspective: 1200px;
     margin-bottom: 1.5rem;
-    min-height: 180px;
+    height: 180px;
   }
 
   .flip-card {
     position: relative;
     width: 100%;
-    min-height: 180px;
+    height: 180px;
     cursor: pointer;
   }
 
@@ -214,7 +214,6 @@
     position: relative;
     width: 100%;
     height: 100%;
-    min-height: 180px;
     transition: transform 0.5s cubic-bezier(.2,.8,.2,1);
     transform-style: preserve-3d;
   }
@@ -236,6 +235,7 @@
     justify-content: center;
     text-align: center;
     padding: 1.5rem;
+    overflow: hidden;
   }
 
   .face .lang {
@@ -324,7 +324,7 @@
     background: var(--card);
     border: 1px dashed var(--border);
     border-radius: 14px;
-    min-height: 180px;
+    height: 100%;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -333,6 +333,7 @@
     color: var(--ink-soft);
     font-size: 0.9rem;
     padding: 1.5rem;
+    box-sizing: border-box;
   }
 
   .practice-filters {
@@ -1054,7 +1055,7 @@
   @media (max-width: 480px) {
     body { padding: 1.5rem 0.75rem; }
     h1 { font-size: 1.25rem; }
-    .card-zone, .flip-card, .flip-inner { min-height: 220px; }
+    .card-zone, .flip-card, .flip-inner { height: 220px; }
     .face .word { font-size: 1.4rem; }
     .add-form { flex-direction: column; }
     .add-form input { font-size: 16px; padding: 0.75rem; }
@@ -1103,8 +1104,8 @@
     <div class="empty-state">Loading your deck&hellip;</div>
   </div>
 
-  <!-- 2. Grade buttons — immediately under card -->
-  <div class="grade-row hidden" id="gradeRow">
+  <!-- 2. Grade buttons — immediately under card (fun mode only) -->
+  <div class="grade-row hidden fun-only" id="gradeRow">
     <button data-q="1">Hard</button>
     <button data-q="2">Moderate</button>
     <button data-q="3">Easy</button>
@@ -1575,7 +1576,10 @@ function renderCardZone() {
   const zone = document.getElementById('cardZone');
   const gradeRow = document.getElementById('gradeRow');
 
-  if (cards.length === 0) {
+  // Basic mode uses consolidated all-cards pool
+  const cardPool = !funMode && allCards.length > 0 ? allCards : cards;
+
+  if (cardPool.length === 0) {
     zone.innerHTML = '<div class="empty-state">You haven\'t added anything yet. Start now to practice.</div>';
     gradeRow.classList.add('hidden');
     showTypeInput(false);
@@ -1594,6 +1598,9 @@ function renderCardZone() {
     if (!currentCard || !currentCard.mastered) {
       currentCard = mastered[Math.floor(Math.random() * mastered.length)];
     }
+  } else if (!funMode) {
+    // Basic mode: random from allCards
+    if (!currentCard) currentCard = cardPool[Math.floor(Math.random() * cardPool.length)];
   } else {
     if (!currentCard) currentCard = pickCard();
     if (currentCard) practiceFilter = null;
@@ -1682,7 +1689,7 @@ function renderCardZone() {
           <p class="word">${escapeHtml(backWord)}</p>
           ${!reverseMode && c.example ? `<p class="example">${escapeHtml(c.example)}</p>` : ''}
           ${!reverseMode && c.notes ? `<p class="note-tag">${escapeHtml(c.notes)}</p>` : ''}
-          <p class="hint">Tap to flip back</p>
+          <p class="hint">${funMode ? 'Tap to flip back' : 'Tap for next card'}</p>
           <button class="icon-btn edit-btn" data-edit="back" aria-label="Edit card" title="Edit card">
             <i class="ti ti-edit" aria-hidden="true"></i>
           </button>
@@ -1716,9 +1723,16 @@ function renderCardZone() {
 
   document.getElementById('flipCard').addEventListener('click', () => {
     if (typeMode) return;
+    if (!funMode && flipped) {
+      // Basic mode: second tap = next card
+      flipped = false;
+      currentCard = null;
+      render();
+      return;
+    }
     flipped = !flipped;
     document.getElementById('flipCard').classList.toggle('flipped', flipped);
-    if (flipped) {
+    if (flipped && funMode) {
       gradeRow.classList.remove('hidden');
       gradeRow.querySelectorAll('button').forEach(b => {
         b.onclick = (e) => {
@@ -1731,13 +1745,13 @@ function renderCardZone() {
     }
   });
 
-  if (typeMode) {
+  if (typeMode && funMode) {
     gradeRow.classList.add('hidden');
     showTypeInput(true);
     setTimeout(() => document.getElementById('typeInput').focus(), 100);
   } else {
     showTypeInput(false);
-    if (flipped) {
+    if (flipped && funMode) {
       gradeRow.classList.remove('hidden');
       gradeRow.querySelectorAll('button').forEach(b => {
         b.onclick = (e) => {
@@ -2374,7 +2388,7 @@ initTheme();
 // ── Basic / Fun mode toggle ───────────────────────────────
 let funMode = false;
 
-function applyMode(fun) {
+async function applyMode(fun) {
   funMode = fun;
   const btn = document.getElementById('modeToggle');
   const label = document.getElementById('modeToggleLabel');
@@ -2386,15 +2400,15 @@ function applyMode(fun) {
     document.body.classList.add('basic-mode');
     btn.classList.remove('fun');
     label.textContent = 'Basic';
-    // Reset fun-only states
     reverseMode = false;
     typeMode = false;
     masteredMode = false;
-    document.getElementById('reverseModeBtn').classList.remove('active');
-    document.getElementById('typeModeBtn').classList.remove('active');
-    document.getElementById('masteredBtn').classList.remove('active');
     showTypeInput(false);
+    // Load all cards for basic mode
+    await fetchAllCards();
   }
+  flipped = false;
+  currentCard = null;
   try { localStorage.setItem('vokabelkarten-mode', fun ? 'fun' : 'basic'); } catch (e) {}
   render();
 }
