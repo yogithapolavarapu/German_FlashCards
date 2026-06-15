@@ -1938,8 +1938,13 @@ function hideChallengeBanner() {
 }
 
 async function checkPendingChallenge() {
-  const { data } = await sb.from('challenges').select('*, cards(*)').eq('invited', profile).eq('status', 'pending').order('created_at', { ascending: false }).limit(1).maybeSingle();
+  const { data } = await sb.from('challenges').select('*').eq('invited', profile).eq('status', 'pending').order('created_at', { ascending: false }).limit(1).maybeSingle();
   if (data) {
+    // Fetch card separately
+    if (data.card_id) {
+      const { data: cardData } = await sb.from('cards').select('*').eq('id', data.card_id).single();
+      data.cards = cardData;
+    }
     pendingChallengeData = data;
     showChallengeBanner(data.created_by);
   }
@@ -1952,8 +1957,12 @@ function subscribeIncomingChallenges() {
       event: 'INSERT', schema: 'public', table: 'challenges',
       filter: `invited=eq.${profile}`
     }, async payload => {
-      const { data } = await sb.from('challenges').select('*, cards(*)').eq('id', payload.new.id).single();
+      const { data } = await sb.from('challenges').select('*').eq('id', payload.new.id).single();
       if (data && data.status === 'pending') {
+        if (data.card_id) {
+          const { data: cardData } = await sb.from('cards').select('*').eq('id', data.card_id).single();
+          data.cards = cardData;
+        }
         pendingChallengeData = data;
         showChallengeBanner(data.created_by);
       }
@@ -1971,7 +1980,12 @@ document.getElementById('challengeBannerBtn').addEventListener('click', async ()
 document.getElementById('challengeBannerDismiss').addEventListener('click', hideChallengeBanner);
 
 async function showOpponentChallenge(challenge) {
-  const card = challenge.cards;
+  // Fetch the card directly since join may not resolve
+  let card = challenge.cards;
+  if (!card && challenge.card_id) {
+    const { data } = await sb.from('cards').select('*').eq('id', challenge.card_id).single();
+    card = data;
+  }
   if (!card) { setStatus('Challenge card not found.'); return; }
   // Fetch all cards for wrong options if needed
   if (allCards.length < 4) await fetchAllCards();
