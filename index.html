@@ -492,6 +492,86 @@
     color: var(--ink-soft);
   }
 
+  .word-of-day {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--gold-soft);
+    border: 1px solid var(--gold);
+    border-radius: 10px;
+    padding: 0.5rem 0.85rem;
+    font-size: 0.85rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .word-of-day.hidden { display: none; }
+
+  .wod-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--gold);
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .wod-word {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .wod-back {
+    color: var(--ink-soft);
+    font-size: 0.8rem;
+  }
+
+  .mode-toggles {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 0.75rem;
+  }
+
+  .mode-btn {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 500;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--ink-soft);
+    border-radius: 20px;
+    padding: 4px 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .mode-btn:hover, .mode-btn.active {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+    color: var(--ink);
+  }
+
+  .mode-btn.active {
+    font-weight: 600;
+  }
+
+  .history-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.6rem 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.85rem;
+    gap: 8px;
+  }
+
+  .history-item:last-child { border-bottom: none; }
+
+  .history-win { color: var(--gold); font-weight: 600; }
+  .history-loss { color: var(--red); font-weight: 600; }
+
   .section-toggle {
     display: flex;
     align-items: center;
@@ -947,6 +1027,8 @@
     .add-form button { padding: 0.75rem 1.1rem; }
     .grade-row { height: 48px; }
     .grade-row button { font-size: 0.85rem; }
+    .stat-value { font-size: 1.2rem; }
+    .stat-label { font-size: 0.65rem; }
   }
 </style>
 </head>
@@ -964,6 +1046,21 @@
     </div>
   </header>
 
+  <!-- Word of the day -->
+  <div id="wordOfDay" class="word-of-day hidden">
+    <span class="wod-label">Word of the day</span>
+    <span id="wodFront" class="wod-word"></span>
+    <span id="wodBack" class="wod-back"></span>
+  </div>
+
+  <!-- Mode toggles -->
+  <div class="mode-toggles">
+    <button id="reverseModeBtn" class="mode-btn" title="Reverse mode: English → German">⇄ Reverse</button>
+    <button id="typeModeBtn" class="mode-btn" title="Typing mode">⌨ Type</button>
+    <button id="masteredBtn" class="mode-btn" title="Practice mastered cards">⭐ Mastered</button>
+    <button id="historyBtn" class="mode-btn" title="Challenge history">📋 History</button>
+  </div>
+
   <!-- 1. Flashcard — main focus -->
   <div class="card-zone" id="cardZone">
     <div class="empty-state">Loading your deck&hellip;</div>
@@ -974,6 +1071,15 @@
     <button data-q="1">Hard</button>
     <button data-q="2">Moderate</button>
     <button data-q="3">Easy</button>
+  </div>
+
+  <!-- Typing mode input -->
+  <div id="typeInputRow" class="hidden" style="display:none;">
+    <form id="typeForm" style="display:flex;gap:8px;margin-bottom:0.75rem;">
+      <input id="typeInput" autocomplete="off" placeholder="Type the answer…" style="flex:1;font-family:'Inter',sans-serif;font-size:0.9rem;padding:0.6rem 0.75rem;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--ink);" />
+      <button type="submit" style="font-family:'JetBrains Mono',monospace;font-size:0.85rem;font-weight:700;background:var(--accent);color:var(--btn-text);border:none;border-radius:8px;padding:0 1rem;cursor:pointer;">Check</button>
+    </form>
+    <p id="typeResult" class="hidden" style="font-size:0.9rem;font-weight:600;text-align:center;margin:0 0 0.75rem;"></p>
   </div>
 
   <!-- 3. Secondary actions row -->
@@ -1009,7 +1115,7 @@
   <hr style="border:none;border-top:1px solid var(--border);margin:0.5rem 0 0.75rem;">
 
   <!-- 6. Stats -->
-  <div class="stats">
+  <div class="stats" style="grid-template-columns:repeat(4,1fr);">
     <div class="stat due">
       <p class="stat-label">Practiced</p>
       <p class="stat-value" id="dueCount">0</p>
@@ -1021,6 +1127,10 @@
     <div class="stat">
       <p class="stat-label">Streak</p>
       <p class="stat-value" id="streakCount">0</p>
+    </div>
+    <div class="stat">
+      <p class="stat-label">⭐ Mastered</p>
+      <p class="stat-value" id="masteredCount">0</p>
     </div>
   </div>
 
@@ -1063,6 +1173,8 @@
     <input id="newProfileInput" autocomplete="off" placeholder="Your name" />
     <label class="modal-label">Pick an avatar</label>
     <div class="avatar-picker" id="emojiPicker"></div>
+    <label class="modal-label">Pick a theme color</label>
+    <div class="avatar-picker" id="colorPicker"></div>
     <div class="modal-actions">
       <button id="profileGoBtn" type="button" class="primary">Continue</button>
     </div>
@@ -1076,6 +1188,8 @@
     <input id="editProfileName" autocomplete="off" />
     <label class="modal-label">Avatar</label>
     <div class="avatar-picker" id="editEmojiPicker"></div>
+    <label class="modal-label">Theme color</label>
+    <div class="avatar-picker" id="editColorPicker"></div>
     <div class="modal-actions">
       <button id="editProfileCancelBtn" type="button">Cancel</button>
       <button id="editProfileSaveBtn" type="button" class="primary">Save</button>
@@ -1133,6 +1247,29 @@
 
 <!-- Confetti canvas -->
 <canvas id="confettiCanvas" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:999;"></canvas>
+
+<!-- Mastered card celebration -->
+<div class="modal-overlay hidden" id="masteredOverlay">
+  <div class="modal" style="text-align:center;">
+    <p style="font-size:2rem; margin:0 0 8px;">⭐</p>
+    <p class="modal-title" id="masteredTitle">Card mastered!</p>
+    <p style="font-size:0.9rem; color:var(--ink-soft); margin:0 0 1.5rem;" id="masteredWord"></p>
+    <div class="modal-actions" style="justify-content:center;">
+      <button id="masteredOkBtn" type="button" class="primary">Keep going!</button>
+    </div>
+  </div>
+</div>
+
+<!-- Challenge history modal -->
+<div class="modal-overlay hidden" id="historyOverlay">
+  <div class="modal">
+    <p class="modal-title">Challenge history</p>
+    <div id="historyBody" style="max-height:300px;overflow-y:auto;"></div>
+    <div class="modal-actions">
+      <button id="historyCloseBtn" type="button" class="primary">Close</button>
+    </div>
+  </div>
+</div>
 
 
 <div class="modal-overlay hidden" id="editOverlay">
@@ -1242,7 +1379,7 @@ async function fetchCards() {
 }
 
 function getDueCards() {
-  return cards.filter(c => c.due <= now());
+  return cards.filter(c => !c.mastered && c.due <= now());
 }
 
 function getPracticedCards() {
@@ -1358,21 +1495,36 @@ async function grade(card, quality) {
   else base = card.interval * (quality === 1 ? 1.3 : quality === 2 ? 2.2 : 3);
   card.interval = Math.max(1, Math.round(base));
   card.due = now() + card.interval * DAY;
-
   card.lastQuality = quality;
 
+  // Mastery tracking
+  if (quality === 3) {
+    card.correct_streak = (card.correct_streak || 0) + 1;
+  } else {
+    card.correct_streak = 0;
+  }
+  const justMastered = !card.mastered && card.correct_streak >= 10;
+  if (justMastered) card.mastered = true;
+
   const { error } = await sb.from('cards').update({
-    interval: card.interval, due: card.due, reps: card.reps
+    interval: card.interval, due: card.due, reps: card.reps,
+    correct_streak: card.correct_streak, mastered: card.mastered
   }).eq('id', card.id);
 
-  if (error) {
-    setStatus('Could not update: ' + error.message, true);
-  }
+  if (error) setStatus('Could not update: ' + error.message, true);
 
   recordPracticeToday();
   recordActivity();
 
+  if (justMastered) {
+    launchConfetti(2500);
+    document.getElementById('masteredTitle').textContent = '⭐ Card mastered!';
+    document.getElementById('masteredWord').textContent = `"${card.front}" — you've nailed it 10 times in a row!`;
+    document.getElementById('masteredOverlay').classList.remove('hidden');
+  }
+
   flipped = false;
+  typingAnswered = false;
   dueQueue = dueQueue.filter(id => id !== card.id);
   currentCard = pickCard();
   if (!currentCard && practiceFilter !== null) {
@@ -1389,11 +1541,26 @@ function renderCardZone() {
   if (cards.length === 0) {
     zone.innerHTML = '<div class="empty-state">You haven\'t added anything yet. Start now to practice.</div>';
     gradeRow.classList.add('hidden');
+    showTypeInput(false);
     return;
   }
 
-  if (!currentCard) currentCard = pickCard();
-  if (currentCard) practiceFilter = null;
+  // Mastered mode — practice mastered cards only
+  if (masteredMode) {
+    const mastered = getMasteredCards();
+    if (mastered.length === 0) {
+      zone.innerHTML = '<div class="empty-state">No mastered cards yet. Keep practicing!</div>';
+      gradeRow.classList.add('hidden');
+      showTypeInput(false);
+      return;
+    }
+    if (!currentCard || !currentCard.mastered) {
+      currentCard = mastered[Math.floor(Math.random() * mastered.length)];
+    }
+  } else {
+    if (!currentCard) currentCard = pickCard();
+    if (currentCard) practiceFilter = null;
+  }
 
   if (!currentCard) {
     if (practiceFilter !== null) {
@@ -1412,6 +1579,7 @@ function renderCardZone() {
           </div>
         `;
         gradeRow.classList.add('hidden');
+        showTypeInput(false);
         zone.querySelectorAll('.practice-filters button').forEach(b => {
           b.onclick = () => {
             practiceFilter = parseInt(b.dataset.pf, 10);
@@ -1423,7 +1591,7 @@ function renderCardZone() {
       }
     } else {
       // All cards practiced — show celebration
-      if (cards.length > 0 && getPracticedCards().length === cards.length) {
+      if (!masteredMode && cards.length > 0 && getPracticedCards().length === cards.length) {
         showAllDone();
       }
       zone.innerHTML = `
@@ -1450,13 +1618,20 @@ function renderCardZone() {
   }
 
   const c = currentCard;
+  const frontWord = reverseMode ? c.back : c.front;
+  const backWord = reverseMode ? c.front : c.back;
+  const frontLang = reverseMode ? 'English' : 'German';
+  const backLang = reverseMode ? 'German' : 'English';
+  const masteredBadge = c.mastered ? `<span style="position:absolute;top:10px;left:50%;transform:translateX(-50%);font-size:11px;color:var(--gold);font-weight:600;">⭐ Mastered</span>` : '';
+
   zone.innerHTML = `
     <div class="flip-card ${flipped ? 'flipped' : ''}" id="flipCard">
       <div class="flip-inner">
-        <div class="face front">
-          <p class="lang">German</p>
-          <p class="word">${escapeHtml(c.front)}</p>
-          <p class="hint">Tap to reveal</p>
+        <div class="face front" style="position:relative;">
+          ${masteredBadge}
+          <p class="lang">${frontLang}</p>
+          <p class="word">${escapeHtml(frontWord)}</p>
+          ${typeMode ? '' : '<p class="hint">Tap to reveal</p>'}
           <button class="icon-btn speak-btn" id="speakBtn" aria-label="Pronounce word" title="Pronounce">
             <i class="ti ti-volume" aria-hidden="true"></i>
           </button>
@@ -1464,11 +1639,12 @@ function renderCardZone() {
             <i class="ti ti-edit" aria-hidden="true"></i>
           </button>
         </div>
-        <div class="face back">
-          <p class="lang">English</p>
-          <p class="word">${escapeHtml(c.back)}</p>
-          ${c.example ? `<p class="example">${escapeHtml(c.example)}</p>` : ''}
-          ${c.notes ? `<p class="note-tag">${escapeHtml(c.notes)}</p>` : ''}
+        <div class="face back" style="position:relative;">
+          ${masteredBadge}
+          <p class="lang">${backLang}</p>
+          <p class="word">${escapeHtml(backWord)}</p>
+          ${!reverseMode && c.example ? `<p class="example">${escapeHtml(c.example)}</p>` : ''}
+          ${!reverseMode && c.notes ? `<p class="note-tag">${escapeHtml(c.notes)}</p>` : ''}
           <p class="hint">Tap to flip back</p>
           <button class="icon-btn edit-btn" data-edit="back" aria-label="Edit card" title="Edit card">
             <i class="ti ti-edit" aria-hidden="true"></i>
@@ -1483,7 +1659,7 @@ function renderCardZone() {
 
   document.getElementById('speakBtn').addEventListener('click', (e) => {
     e.stopPropagation();
-    speak(c.front);
+    speak(reverseMode ? c.back : c.front);
   });
 
   zone.querySelectorAll('.edit-btn').forEach(b => {
@@ -1502,11 +1678,17 @@ function renderCardZone() {
   }
 
   document.getElementById('flipCard').addEventListener('click', () => {
+    if (typeMode) return; // typing mode handles its own flow
     flipped = !flipped;
     render();
   });
 
-  if (flipped) {
+  if (typeMode) {
+    gradeRow.classList.add('hidden');
+    showTypeInput(true);
+    setTimeout(() => document.getElementById('typeInput').focus(), 100);
+  } else if (flipped) {
+    showTypeInput(false);
     gradeRow.classList.remove('hidden');
     gradeRow.querySelectorAll('button').forEach(b => {
       b.onclick = (e) => {
@@ -1515,6 +1697,7 @@ function renderCardZone() {
       };
     });
   } else {
+    showTypeInput(false);
     gradeRow.classList.add('hidden');
   }
 }
@@ -1522,6 +1705,7 @@ function renderCardZone() {
 function render() {
   document.getElementById('dueCount').textContent = getPracticedCards().length;
   document.getElementById('totalCount').textContent = cards.length;
+  document.getElementById('masteredCount').textContent = getMasteredCards().length;
   renderCardZone();
   renderDeckList();
   const chartSection = document.getElementById('chartSection');
@@ -1714,15 +1898,7 @@ function showQuizCard(pool) {
   const addWrap = document.getElementById('quizAddToDeck');
   if (addWrap) addWrap.style.display = 'none';
   const optionPool = pool === 'all' ? allCards : cards;
-  const wrongs = optionPool.filter(c => c.id !== quizCard.id);
-  const options = [quizCard.back];
-  const wrongPool = [...wrongs];
-  while (options.length < 4 && wrongPool.length > 0) {
-    const idx = Math.floor(Math.random() * wrongPool.length);
-    const pick = wrongPool.splice(idx, 1)[0].back;
-    if (!options.includes(pick)) options.push(pick);
-  }
-  options.sort(() => Math.random() - 0.5);
+  const options = getQuizOptions(quizCard.back, optionPool);
   document.getElementById('quizQuestion').textContent = quizCard.front;
   const optEl = document.getElementById('quizOptions');
   optEl.innerHTML = options.map(o => `<button class="quiz-option" data-answer="${escapeHtml(o)}">${escapeHtml(o)}</button>`).join('');
@@ -2263,6 +2439,7 @@ document.getElementById('editOverlay').addEventListener('click', (e) => {
 // Edit profile
 let editingProfileName = null;
 let editingProfileEmoji = null;
+let editingProfileColor = null;
 
 function renderEditEmojiPicker() {
   const el = document.getElementById('editEmojiPicker');
@@ -2275,11 +2452,16 @@ function renderEditEmojiPicker() {
       renderEditEmojiPicker();
     });
   });
+  renderColorSwatch('editColorPicker', editingProfileColor || THEME_COLORS[0], (c) => {
+    editingProfileColor = c;
+    renderEditEmojiPicker();
+  });
 }
 
-function openEditProfileModal(name, emoji) {
+function openEditProfileModal(name, emoji, color) {
   editingProfileName = name;
   editingProfileEmoji = emoji || EMOJI_OPTIONS[0];
+  editingProfileColor = color || THEME_COLORS[0];
   document.getElementById('editProfileName').value = name;
   renderEditEmojiPicker();
   document.getElementById('editProfileOverlay').classList.remove('hidden');
@@ -2295,8 +2477,8 @@ async function saveEditedProfile() {
   if (!newName || !editingProfileName) return;
   const oldName = editingProfileName;
   const newEmoji = editingProfileEmoji;
+  const newColor = editingProfileColor;
 
-  // Update all cards with old profile name
   if (newName !== oldName) {
     const { error: cardErr } = await sb.from('cards').update({ profile: newName }).eq('profile', oldName);
     if (cardErr) { setStatus('Could not rename: ' + cardErr.message, true); return; }
@@ -2304,21 +2486,19 @@ async function saveEditedProfile() {
     if (actErr) { setStatus('Could not rename activity: ' + actErr.message, true); return; }
   }
 
-  // Upsert streak with new name and emoji
   await sb.from('streaks').delete().eq('profile', oldName);
-  await sb.from('streaks').upsert({ profile: newName, avatar_emoji: newEmoji });
+  await sb.from('streaks').upsert({ profile: newName, avatar_emoji: newEmoji, theme_color: newColor });
 
-  // If this is the current profile, update local state
   if (profile === oldName) {
     profile = newName;
-    currentAvatar = { emoji: newEmoji };
+    currentAvatar = { emoji: newEmoji, theme_color: newColor };
     try { localStorage.setItem('vokabelkarten-profile', profile); } catch (e) {}
     document.getElementById('profileLabel').innerHTML = avatarChip(newEmoji) + escapeHtml(profile);
+    applyProfileTheme(newColor);
   }
 
   closeEditProfileModal();
   setStatus('Profile updated.');
-  // Refresh picker list
   showProfilePicker();
 }
 
@@ -2329,8 +2509,21 @@ document.getElementById('editProfileOverlay').addEventListener('click', (e) => {
 });
 
 const EMOJI_OPTIONS = ['🦊','🐻','🐱','🐶','🦉','🐢','🐸','🦁','🐼','🐧','🦄','🐝'];
+const THEME_COLORS = ['#3A5A78','#B5564A','#C99A3B','#5B8BAE','#9C6ADE','#E07A5F','#4A9D8A','#D4518A'];
 
 let selectedEmoji = EMOJI_OPTIONS[0];
+let selectedThemeColor = THEME_COLORS[0];
+
+function renderColorSwatch(containerId, current, onChange) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  el.innerHTML = THEME_COLORS.map(c =>
+    `<button type="button" data-color="${c}" class="${c === current ? 'selected' : ''}" style="background:${c};"></button>`
+  ).join('');
+  el.querySelectorAll('button').forEach(b => {
+    b.addEventListener('click', () => { onChange(b.dataset.color); });
+  });
+}
 
 function renderAvatarPickers() {
   const emojiEl = document.getElementById('emojiPicker');
@@ -2343,22 +2536,35 @@ function renderAvatarPickers() {
       renderAvatarPickers();
     });
   });
+  renderColorSwatch('colorPicker', selectedThemeColor, (c) => {
+    selectedThemeColor = c;
+    renderAvatarPickers();
+  });
 }
 
 function avatarChip(emoji) {
   return `<span class="avatar-chip" style="background:var(--accent-soft);">${emoji || ''}</span>`;
 }
 
+function applyProfileTheme(color) {
+  if (!color) return;
+  document.documentElement.style.setProperty('--accent', color);
+  // derive soft version by adding opacity
+  document.documentElement.style.setProperty('--accent-soft', color + '22');
+  document.documentElement.style.setProperty('--btn-hover', color + 'cc');
+}
+
 async function fetchKnownProfiles() {
   const { data: cardRows, error: cardErr } = await sb.from('cards').select('profile');
-  const { data: streakRows } = await sb.from('streaks').select('profile, avatar_emoji');
+  const { data: streakRows } = await sb.from('streaks').select('profile, avatar_emoji, theme_color');
   if (cardErr || !cardRows) return [];
   const names = new Set(cardRows.map(r => r.profile).filter(Boolean));
   const avatarMap = {};
   (streakRows || []).forEach(r => { avatarMap[r.profile] = r; });
   return Array.from(names).map(n => ({
     name: n,
-    emoji: avatarMap[n] ? avatarMap[n].avatar_emoji : null
+    emoji: avatarMap[n] ? avatarMap[n].avatar_emoji : null,
+    theme_color: avatarMap[n] ? avatarMap[n].theme_color : null
   }));
 }
 
@@ -2371,8 +2577,8 @@ async function showProfilePicker() {
   } else {
     list.innerHTML = known.map(p =>
       `<div class="profile-list-row">
-        <button class="profile-pick-btn" data-profile="${escapeHtml(p.name)}">${avatarChip(p.emoji)}${escapeHtml(p.name)}</button>
-        <button class="profile-edit-icon" data-profile="${escapeHtml(p.name)}" data-emoji="${escapeHtml(p.emoji || '')}" aria-label="Edit profile" title="Edit"><i class="ti ti-pencil"></i></button>
+        <button class="profile-pick-btn" data-profile="${escapeHtml(p.name)}">${avatarChip(p.emoji)}${escapeHtml(p.name)}${p.theme_color ? `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${p.theme_color};margin-left:6px;"></span>` : ''}</button>
+        <button class="profile-edit-icon" data-profile="${escapeHtml(p.name)}" data-emoji="${escapeHtml(p.emoji || '')}" data-color="${escapeHtml(p.theme_color || '')}" aria-label="Edit profile" title="Edit"><i class="ti ti-pencil"></i></button>
       </div>`
     ).join('');
     list.querySelectorAll('.profile-pick-btn').forEach(b => {
@@ -2381,7 +2587,7 @@ async function showProfilePicker() {
     list.querySelectorAll('.profile-edit-icon').forEach(b => {
       b.addEventListener('click', (e) => {
         e.stopPropagation();
-        openEditProfileModal(b.dataset.profile, b.dataset.emoji);
+        openEditProfileModal(b.dataset.profile, b.dataset.emoji, b.dataset.color);
       });
     });
   }
@@ -2389,7 +2595,7 @@ async function showProfilePicker() {
   overlay.classList.remove('hidden');
 }
 
-let currentAvatar = { emoji: null };
+let currentAvatar = { emoji: null, theme_color: null };
 
 async function selectProfile(name) {
   name = name.trim();
@@ -2402,12 +2608,13 @@ async function selectProfile(name) {
   await fetchStreak();
   await fetchActivity();
   if (isNew) {
-    currentAvatar = { emoji: selectedEmoji };
-    await sb.from('streaks').upsert({ profile, avatar_emoji: selectedEmoji });
+    currentAvatar = { emoji: selectedEmoji, theme_color: selectedThemeColor };
+    await sb.from('streaks').upsert({ profile, avatar_emoji: selectedEmoji, theme_color: selectedThemeColor });
   } else {
-    const { data } = await sb.from('streaks').select('avatar_emoji').eq('profile', profile).maybeSingle();
-    currentAvatar = { emoji: data ? data.avatar_emoji : null };
+    const { data } = await sb.from('streaks').select('avatar_emoji, theme_color').eq('profile', profile).maybeSingle();
+    currentAvatar = { emoji: data ? data.avatar_emoji : null, theme_color: data ? data.theme_color : null };
   }
+  applyProfileTheme(currentAvatar.theme_color);
   document.getElementById('profileLabel').innerHTML = avatarChip(currentAvatar.emoji) + escapeHtml(profile);
   practiceFilter = null;
   dueQueue = [];
@@ -2417,7 +2624,12 @@ async function selectProfile(name) {
   updateChallengeBadge();
   if (incomingChannel) { sb.removeChannel(incomingChannel); incomingChannel = null; }
   flipped = false;
+  reverseMode = false;
+  typeMode = false;
+  document.getElementById('reverseModeBtn').classList.remove('active');
+  document.getElementById('typeModeBtn').classList.remove('active');
   render();
+  fetchWordOfDay();
   if (cards.length === 0) setStatus('');
 }
 
@@ -2438,6 +2650,168 @@ document.getElementById('switchProfileLink').addEventListener('click', (e) => {
   e.preventDefault();
   showProfilePicker();
 });
+
+// ── Reverse mode & Typing mode ───────────────────────────
+let reverseMode = false;
+let typeMode = false;
+let typingAnswered = false;
+
+document.getElementById('reverseModeBtn').addEventListener('click', () => {
+  reverseMode = !reverseMode;
+  document.getElementById('reverseModeBtn').classList.toggle('active', reverseMode);
+  flipped = false;
+  render();
+});
+
+document.getElementById('typeModeBtn').addEventListener('click', () => {
+  typeMode = !typeMode;
+  document.getElementById('typeModeBtn').classList.toggle('active', typeMode);
+  flipped = false;
+  typingAnswered = false;
+  render();
+});
+
+function showTypeInput(show) {
+  const row = document.getElementById('typeInputRow');
+  if (show) {
+    row.style.display = 'block';
+    row.classList.remove('hidden');
+    document.getElementById('typeInput').value = '';
+    document.getElementById('typeResult').classList.add('hidden');
+    typingAnswered = false;
+  } else {
+    row.style.display = 'none';
+  }
+}
+
+document.getElementById('typeForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  if (!currentCard || typingAnswered) return;
+  const typed = document.getElementById('typeInput').value.trim().toLowerCase();
+  const expected = (reverseMode ? currentCard.front : currentCard.back).toLowerCase();
+  const correct = typed === expected;
+  const result = document.getElementById('typeResult');
+  result.textContent = correct ? `✓ Correct!` : `✗ The answer was "${reverseMode ? currentCard.front : currentCard.back}"`;
+  result.style.color = correct ? 'var(--gold)' : 'var(--red)';
+  result.classList.remove('hidden');
+  typingAnswered = true;
+  if (correct) launchConfetti(1500);
+  // auto-grade after typing
+  setTimeout(() => {
+    grade(currentCard, correct ? 3 : 1);
+    showTypeInput(true);
+  }, 1200);
+});
+
+// ── Mastered cards ────────────────────────────────────────
+let masteredMode = false;
+
+document.getElementById('masteredBtn').addEventListener('click', () => {
+  masteredMode = !masteredMode;
+  document.getElementById('masteredBtn').classList.toggle('active', masteredMode);
+  flipped = false;
+  currentCard = null;
+  render();
+});
+
+function getMasteredCards() {
+  return cards.filter(c => c.mastered);
+}
+
+function getNonMasteredDueCards() {
+  return cards.filter(c => !c.mastered && c.due <= now());
+}
+
+document.getElementById('masteredOkBtn').addEventListener('click', () => {
+  document.getElementById('masteredOverlay').classList.add('hidden');
+});
+
+// ── Word of the day ───────────────────────────────────────
+async function fetchWordOfDay() {
+  const today = todayStr();
+  const { data: existing } = await sb.from('word_of_day').select('*').eq('date', today).maybeSingle();
+  if (existing) {
+    showWordOfDay(existing.front, existing.back);
+    return;
+  }
+  // Pick from consolidated all-cards pool
+  const { data: allC } = await sb.from('cards').select('id, front, back');
+  if (!allC || allC.length === 0) return;
+  const pick = allC[Math.floor(Math.random() * allC.length)];
+  await sb.from('word_of_day').upsert({ date: today, card_id: pick.id, front: pick.front, back: pick.back });
+  showWordOfDay(pick.front, pick.back);
+}
+
+function showWordOfDay(front, back) {
+  const el = document.getElementById('wordOfDay');
+  document.getElementById('wodFront').textContent = front;
+  document.getElementById('wodBack').textContent = '— ' + back;
+  el.classList.remove('hidden');
+}
+
+// ── Challenge history ─────────────────────────────────────
+async function showChallengeHistory() {
+  const { data } = await sb.from('challenges')
+    .select('*')
+    .or(`created_by.eq.${profile},invited.eq.${profile}`)
+    .order('created_at', { ascending: false })
+    .limit(30);
+
+  const body = document.getElementById('historyBody');
+  if (!data || data.length === 0) {
+    body.innerHTML = '<p style="color:var(--ink-soft);font-size:0.85rem;text-align:center;padding:1rem;">No challenge history yet.</p>';
+  } else {
+    body.innerHTML = data.map(c => {
+      const isChallenger = c.created_by === profile;
+      const opponent = isChallenger ? c.invited : c.created_by;
+      const won = c.winner === profile;
+      const date = new Date(c.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+      let result = '';
+      if (c.status === 'answered') {
+        result = won ? `<span class="history-win">Won</span>` : `<span class="history-loss">Lost</span>`;
+      } else {
+        result = `<span style="color:var(--ink-soft)">Pending</span>`;
+      }
+      return `<div class="history-item">
+        <div>
+          <div style="font-weight:500;">${isChallenger ? '⚡ You → ' : '🎯 '}${escapeHtml(opponent)}</div>
+          <div style="font-size:0.75rem;color:var(--ink-soft);">${date}</div>
+        </div>
+        <div>${result}</div>
+      </div>`;
+    }).join('');
+  }
+  document.getElementById('historyOverlay').classList.remove('hidden');
+}
+
+document.getElementById('historyBtn').addEventListener('click', showChallengeHistory);
+document.getElementById('historyCloseBtn').addEventListener('click', () => {
+  document.getElementById('historyOverlay').classList.add('hidden');
+});
+
+// ── Funny wrong answers ───────────────────────────────────
+const FUNNY_ANSWERS = [
+  'Potato', 'Definitely not this', 'Ich weiß nicht', 'Das Auto',
+  'Nein!', 'Jawohl', 'Wurst', 'Bratwurst', 'Lederhosen', 'Oktoberfest',
+  'Something German', 'A very long word', 'Sprechen Sie Deutsch?', 'Ja ja ja'
+];
+
+function getQuizOptions(correctAnswer, pool, count = 4) {
+  const wrongs = pool.filter(c => c.back !== correctAnswer);
+  const options = [correctAnswer];
+  // 1 in 5 chance of a funny answer
+  if (Math.random() < 0.2 && count === 4) {
+    const funny = FUNNY_ANSWERS[Math.floor(Math.random() * FUNNY_ANSWERS.length)];
+    if (!options.includes(funny)) options.push(funny);
+  }
+  const shuffledWrongs = [...wrongs].sort(() => Math.random() - 0.5);
+  for (const w of shuffledWrongs) {
+    if (options.length >= count) break;
+    if (!options.includes(w.back)) options.push(w.back);
+  }
+  while (options.length < count) options.push('—');
+  return options.sort(() => Math.random() - 0.5);
+}
 
 (async function init() {
   let saved = '';
