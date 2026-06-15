@@ -1027,13 +1027,7 @@
   <div class="card-zone" id="cardZone">
     <div class="empty-state">Loading your deck&hellip;</div>
   </div>
-  <div class="grade-row hidden" id="gradeRow">
-    <button data-q="1">Hard</button>
-    <button data-q="2">Moderate</button>
-    <button data-q="3">Easy</button>
-  </div>
-
-  <div class="toolbar">
+  <div class="toolbar" style="margin-bottom:0.5rem;">
     <button id="shuffleBtn" title="Shuffle deck order">
       <i class="ti ti-arrows-shuffle" aria-hidden="true"></i> Shuffle
     </button>
@@ -1043,6 +1037,15 @@
     <button id="challengeBtn" title="Challenge a friend">
       <i class="ti ti-bolt" aria-hidden="true"></i> Challenge
     </button>
+  </div>
+
+  <div class="grade-row hidden" id="gradeRow">
+    <button data-q="1">Hard</button>
+    <button data-q="2">Moderate</button>
+    <button data-q="3">Easy</button>
+  </div>
+
+  <div class="toolbar">
     <div class="toolbar-group">
       <span class="toolbar-label">Send to deck:</span>
       <button data-send="1">Hard</button>
@@ -1830,6 +1833,7 @@ async function fetchOtherProfiles() {
 }
 
 function openChallengePicker(specificCard) {
+  if (specificCard instanceof Event) specificCard = null;
   const overlay = document.getElementById('challengeOverlay');
   const body = document.getElementById('challengeBody');
   document.getElementById('challengeTitle').textContent = 'Challenge a friend';
@@ -2027,7 +2031,7 @@ async function showOpponentChallenge(challenge) {
   overlay.classList.remove('hidden');
 }
 
-document.getElementById('challengeBtn').addEventListener('click', openChallengePicker);
+document.getElementById('challengeBtn').addEventListener('click', () => openChallengePicker());
 document.getElementById('challengeCloseBtn').addEventListener('click', () => {
   document.getElementById('challengeOverlay').classList.add('hidden');
   if (challengeChannel) { sb.removeChannel(challengeChannel); challengeChannel = null; }
