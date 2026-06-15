@@ -1617,38 +1617,58 @@ let quizQueue = [];
 let quizIndex = 0;
 let quizTotal = 0;
 let quizScore = 0;
+let quizPool = 'mine';
 
-function startQuizSizePicker() {
+let allCards = []; // combined pool from all profiles
+
+async function fetchAllCards() {
+  const { data, error } = await sb.from('cards').select('*');
+  if (!error && data) allCards = data;
+}
+
+async function startQuizSizePicker() {
   if (cards.length < 4) { setStatus('Need at least 4 cards to quiz.'); return; }
-  const sizes = [10, 25, cards.length].filter((v, i, a) => a.indexOf(v) === i && v <= cards.length);
+  await fetchAllCards();
+  const hasCombined = allCards.length > cards.length && allCards.length >= 4;
   const sizePicker = document.getElementById('quizSizePicker');
   const cardArea = document.getElementById('quizCardArea');
   const sizeOptions = document.getElementById('quizSizeOptions');
-  sizeOptions.innerHTML = sizes.map(s =>
-    `<button class="quiz-option" data-size="${s}">${s === cards.length ? `Full deck (${s})` : `${s} cards`}</button>`
-  ).join('');
+
+  const myOptions = [10, 25, cards.length]
+    .filter((v, i, a) => a.indexOf(v) === i && v <= cards.length)
+    .map(s => `<button class="quiz-option" data-size="${s}" data-pool="mine">${s === cards.length ? `My full deck (${s})` : `${s} from my deck`}</button>`);
+
+  const combinedOptions = hasCombined
+    ? [10, 25, allCards.length]
+        .filter((v, i, a) => a.indexOf(v) === i && v <= allCards.length)
+        .map(s => `<button class="quiz-option" data-size="${s}" data-pool="all" style="border-color:var(--gold);">${s === allCards.length ? `Everyone's full deck (${s})` : `${s} from everyone's deck`}</button>`)
+    : [];
+
+  sizeOptions.innerHTML = [...myOptions, ...combinedOptions].join('');
   sizePicker.style.display = 'block';
   cardArea.style.display = 'none';
   document.getElementById('quizProgress').textContent = '';
   document.getElementById('quizNextBtn').classList.add('hidden');
   sizeOptions.querySelectorAll('.quiz-option').forEach(b => {
-    b.addEventListener('click', () => startQuiz(parseInt(b.dataset.size)));
+    b.addEventListener('click', () => startQuiz(parseInt(b.dataset.size), b.dataset.pool));
   });
   document.getElementById('quizOverlay').classList.remove('hidden');
 }
 
-function startQuiz(size) {
-  const shuffled = [...cards].sort(() => Math.random() - 0.5);
+function startQuiz(size, pool = 'mine') {
+  const source = pool === 'all' ? allCards : cards;
+  const shuffled = [...source].sort(() => Math.random() - 0.5);
   quizQueue = shuffled.slice(0, size);
   quizIndex = 0;
   quizTotal = quizQueue.length;
   quizScore = 0;
+  quizPool = pool;
   document.getElementById('quizSizePicker').style.display = 'none';
   document.getElementById('quizCardArea').style.display = 'block';
-  showQuizCard();
+  showQuizCard(pool);
 }
 
-function showQuizCard() {
+function showQuizCard(pool) {
   if (quizIndex >= quizTotal) {
     showQuizFinished();
     return;
@@ -1656,12 +1676,13 @@ function showQuizCard() {
   quizAnswered = false;
   quizCard = quizQueue[quizIndex];
   document.getElementById('quizProgress').textContent = `${quizIndex + 1} / ${quizTotal}`;
-  const wrongs = cards.filter(c => c.id !== quizCard.id);
+  const optionPool = pool === 'all' ? allCards : cards;
+  const wrongs = optionPool.filter(c => c.id !== quizCard.id);
   const options = [quizCard.back];
-  const pool = [...wrongs];
-  while (options.length < 4 && pool.length > 0) {
-    const idx = Math.floor(Math.random() * pool.length);
-    const pick = pool.splice(idx, 1)[0].back;
+  const wrongPool = [...wrongs];
+  while (options.length < 4 && wrongPool.length > 0) {
+    const idx = Math.floor(Math.random() * wrongPool.length);
+    const pick = wrongPool.splice(idx, 1)[0].back;
     if (!options.includes(pick)) options.push(pick);
   }
   options.sort(() => Math.random() - 0.5);
@@ -1711,15 +1732,12 @@ document.getElementById('quizCloseBtn').addEventListener('click', () => {
   document.getElementById('quizOverlay').classList.add('hidden');
 });
 document.getElementById('quizNextBtn').addEventListener('click', () => {
-  if (quizIndex + 1 >= quizTotal && quizAnswered) {
-    quizIndex++;
-    showQuizCard();
-  } else if (document.getElementById('quizNextBtn').textContent === 'Quiz again') {
+  if (document.getElementById('quizNextBtn').textContent === 'Quiz again') {
     document.getElementById('quizOverlay').classList.add('hidden');
     startQuizSizePicker();
   } else {
     quizIndex++;
-    showQuizCard();
+    showQuizCard(quizPool);
   }
 });
 
