@@ -1132,6 +1132,7 @@
       <p class="quiz-question" id="quizQuestion"></p>
       <div class="quiz-options" id="quizOptions"></div>
       <p class="quiz-result hidden" id="quizResult"></p>
+      <div id="quizAddToDeck" style="display:none; margin-top:8px; text-align:center;"></div>
     </div>
     <div class="modal-actions">
       <button id="quizCloseBtn" type="button">Close</button>
@@ -1496,6 +1497,9 @@ function renderCardZone() {
           <button class="icon-btn edit-btn" data-edit="back" aria-label="Edit card" title="Edit card">
             <i class="ti ti-edit" aria-hidden="true"></i>
           </button>
+          <button class="icon-btn challenge-card-btn" aria-label="Challenge with this card" title="Challenge a friend with this card" style="bottom:10px;right:10px;top:auto;">
+            <i class="ti ti-bolt" aria-hidden="true"></i>
+          </button>
         </div>
       </div>
     </div>
@@ -1512,6 +1516,14 @@ function renderCardZone() {
       openEditModal(c);
     });
   });
+
+  const challengeCardBtn = zone.querySelector('.challenge-card-btn');
+  if (challengeCardBtn) {
+    challengeCardBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openChallengePicker(c);
+    });
+  }
 
   document.getElementById('flipCard').addEventListener('click', () => {
     flipped = !flipped;
@@ -1723,6 +1735,8 @@ function showQuizCard(pool) {
   quizAnswered = false;
   quizCard = quizQueue[quizIndex];
   document.getElementById('quizProgress').textContent = `${quizIndex + 1} / ${quizTotal}`;
+  const addWrap = document.getElementById('quizAddToDeck');
+  if (addWrap) addWrap.style.display = 'none';
   const optionPool = pool === 'all' ? allCards : cards;
   const wrongs = optionPool.filter(c => c.id !== quizCard.id);
   const options = [quizCard.back];
@@ -1751,6 +1765,22 @@ function showQuizCard(pool) {
       result.textContent = correct ? '✓ Correct!' : `✗ It was "${quizCard.back}"`;
       result.className = 'quiz-result ' + (correct ? 'correct-msg' : 'wrong-msg');
       result.classList.remove('hidden');
+
+      // Show "Add to my deck" if this card is from another profile
+      const addWrap = document.getElementById('quizAddToDeck');
+      const alreadyMine = cards.some(c => c.id === quizCard.id);
+      if (!alreadyMine && quizPool === 'all') {
+        addWrap.style.display = 'block';
+        addWrap.innerHTML = `<button id="quizAddCardBtn" style="font-family:'Inter',sans-serif;font-size:0.8rem;font-weight:500;border:1px solid var(--accent);background:var(--accent-soft);color:var(--ink);border-radius:8px;padding:5px 12px;cursor:pointer;">+ Add "${escapeHtml(quizCard.front)}" to my deck</button>`;
+        document.getElementById('quizAddCardBtn').addEventListener('click', async () => {
+          await addCard(quizCard.front, quizCard.back, quizCard.example, quizCard.notes);
+          document.getElementById('quizAddCardBtn').textContent = '✓ Added!';
+          document.getElementById('quizAddCardBtn').disabled = true;
+        });
+      } else {
+        addWrap.style.display = 'none';
+      }
+
       const nextBtn = document.getElementById('quizNextBtn');
       nextBtn.textContent = quizIndex + 1 < quizTotal ? 'Next' : 'See results';
       nextBtn.classList.remove('hidden');
@@ -1799,29 +1829,53 @@ async function fetchOtherProfiles() {
   return (data || []).filter(p => p.profile !== profile);
 }
 
-function openChallengePicker() {
+function openChallengePicker(specificCard) {
   const overlay = document.getElementById('challengeOverlay');
   const body = document.getElementById('challengeBody');
   document.getElementById('challengeTitle').textContent = 'Challenge a friend';
   fetchOtherProfiles().then(others => {
     if (others.length === 0) {
       body.innerHTML = '<p class="challenge-waiting">No other profiles yet. Share the app with friends first!</p>';
-    } else {
-      body.innerHTML = `<p style="font-size:0.85rem;color:var(--ink-soft);margin:0 0 8px;">Pick a profile to challenge:</p>
-        <div class="challenge-profile-list">${others.map(p =>
-          `<button data-profile="${escapeHtml(p.profile)}">${p.avatar_emoji || ''} ${escapeHtml(p.profile)}</button>`
-        ).join('')}</div>`;
-      body.querySelectorAll('button[data-profile]').forEach(b => {
-        b.addEventListener('click', () => startChallenge(b.dataset.profile));
+      overlay.classList.remove('hidden');
+      return;
+    }
+    let selectedCard = specificCard || null;
+    const cardSection = specificCard
+      ? `<p style="font-size:0.85rem;color:var(--ink-soft);margin:0 0 10px;">Challenging with: <strong>${escapeHtml(specificCard.front)}</strong></p>`
+      : `<p style="font-size:0.85rem;color:var(--ink-soft);margin:0 0 6px;">Pick a word to challenge with:</p>
+         <div class="deck-list" style="max-height:160px;overflow-y:auto;margin-bottom:10px;" id="challengeCardList">
+           ${cards.map(c => `<div class="deck-item" style="cursor:pointer;" data-id="${c.id}">
+             <div class="pair"><span class="de">${escapeHtml(c.front)}</span><span class="en"> — ${escapeHtml(c.back)}</span></div>
+           </div>`).join('')}
+         </div>`;
+    body.innerHTML = `${cardSection}
+      <p style="font-size:0.85rem;color:var(--ink-soft);margin:0 0 6px;">Challenge who?</p>
+      <div class="challenge-profile-list">${others.map(p =>
+        `<button data-profile="${escapeHtml(p.profile)}">${p.avatar_emoji || ''} ${escapeHtml(p.profile)}</button>`
+      ).join('')}</div>`;
+
+    if (!specificCard) {
+      body.querySelectorAll('#challengeCardList .deck-item').forEach(row => {
+        row.addEventListener('click', () => {
+          body.querySelectorAll('#challengeCardList .deck-item').forEach(r => r.style.background = '');
+          row.style.background = 'var(--accent-soft)';
+          selectedCard = cards.find(c => String(c.id) === row.dataset.id) || null;
+        });
       });
     }
+
+    body.querySelectorAll('button[data-profile]').forEach(b => {
+      b.addEventListener('click', () => {
+        const card = selectedCard || cards[Math.floor(Math.random() * cards.length)];
+        startChallenge(b.dataset.profile, card);
+      });
+    });
+    overlay.classList.remove('hidden');
   });
-  overlay.classList.remove('hidden');
 }
 
-async function startChallenge(opponent) {
-  if (cards.length === 0) { setStatus('Add cards first.'); return; }
-  const card = cards[Math.floor(Math.random() * cards.length)];
+async function startChallenge(opponent, card) {
+  if (!card) { setStatus('Pick a card first.'); return; }
   challengeCardId = card.id;
   challengeRole = 'challenger';
   const { data, error } = await sb.from('challenges').insert({
@@ -1903,22 +1957,26 @@ function subscribeIncomingChallenges() {
     .subscribe();
 }
 
-document.getElementById('challengeBannerBtn').addEventListener('click', () => {
+document.getElementById('challengeBannerBtn').addEventListener('click', async () => {
   if (pendingChallengeData) {
     hideChallengeBanner();
-    showOpponentChallenge(pendingChallengeData);
+    await showOpponentChallenge(pendingChallengeData);
   }
 });
 
 document.getElementById('challengeBannerDismiss').addEventListener('click', hideChallengeBanner);
 
-function showOpponentChallenge(challenge) {
+async function showOpponentChallenge(challenge) {
   const card = challenge.cards;
-  if (!card || cards.length < 4) return;
+  if (!card) { setStatus('Challenge card not found.'); return; }
+  // Fetch all cards for wrong options if needed
+  if (allCards.length < 4) await fetchAllCards();
+  const optionSource = allCards.length >= 4 ? allCards : cards.length >= 4 ? cards : null;
+  if (!optionSource) { setStatus('Not enough cards in the app to generate options yet.'); return; }
   const overlay = document.getElementById('challengeOverlay');
   const body = document.getElementById('challengeBody');
   document.getElementById('challengeTitle').textContent = `${escapeHtml(challenge.created_by)} challenges you!`;
-  const wrongs = cards.filter(c => c.id !== card.id);
+  const wrongs = optionSource.filter(c => c.id !== card.id);
   const options = [card.back];
   const pool = [...wrongs];
   while (options.length < 4 && pool.length > 0) {
@@ -1926,11 +1984,13 @@ function showOpponentChallenge(challenge) {
     const pick = pool.splice(idx, 1)[0].back;
     if (!options.includes(pick)) options.push(pick);
   }
+  while (options.length < 4) options.push('—');
   options.sort(() => Math.random() - 0.5);
   body.innerHTML = `
     <p class="challenge-card">${escapeHtml(card.front)}</p>
     <div class="quiz-options">${options.map(o => `<button class="quiz-option" data-answer="${escapeHtml(o)}">${escapeHtml(o)}</button>`).join('')}</div>
     <p class="quiz-result hidden" id="challengeAnswerResult"></p>
+    <div id="challengeAddToDeck" style="display:none; margin-top:8px; text-align:center;"></div>
   `;
   body.querySelectorAll('.quiz-option').forEach(b => {
     b.addEventListener('click', async () => {
@@ -1948,6 +2008,18 @@ function showOpponentChallenge(challenge) {
         res.textContent = correct ? '✓ Correct! Result sent!' : `✗ Wrong! Answer: "${card.back}"`;
         res.className = 'quiz-result ' + (correct ? 'correct-msg' : 'wrong-msg');
         res.classList.remove('hidden');
+      }
+      // Show "Add to my deck" if card isn't already in user's deck
+      const alreadyMine = cards.some(c => c.id === card.id);
+      const addWrap = document.getElementById('challengeAddToDeck');
+      if (!alreadyMine && addWrap) {
+        addWrap.style.display = 'block';
+        addWrap.innerHTML = `<button id="challengeAddCardBtn" style="font-family:'Inter',sans-serif;font-size:0.8rem;font-weight:500;border:1px solid var(--accent);background:var(--accent-soft);color:var(--ink);border-radius:8px;padding:5px 12px;cursor:pointer;">+ Add "${escapeHtml(card.front)}" to my deck</button>`;
+        document.getElementById('challengeAddCardBtn').addEventListener('click', async () => {
+          await addCard(card.front, card.back, card.example, card.notes);
+          document.getElementById('challengeAddCardBtn').textContent = '✓ Added!';
+          document.getElementById('challengeAddCardBtn').disabled = true;
+        });
       }
       if (correct) launchConfetti(2000);
     });
