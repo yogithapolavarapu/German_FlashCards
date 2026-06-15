@@ -1710,7 +1710,7 @@ function renderCardZone() {
   const backWord = reverseMode ? c.front : c.back;
   const frontLang = reverseMode ? 'English' : 'German';
   const backLang = reverseMode ? 'German' : 'English';
-  const masteredBadge = c.mastered ? `<span style="position:absolute;top:10px;left:50%;transform:translateX(-50%);font-size:11px;color:var(--gold);font-weight:600;">⭐ Mastered</span>` : '';
+  const masteredBadge = c.mastered ? `<span style="font-size:11px;color:var(--gold);font-weight:600;margin-bottom:4px;">⭐ Mastered</span>` : '';
 
   zone.innerHTML = `
     <div class="flip-card ${flipped ? 'flipped' : ''}" id="flipCard">
