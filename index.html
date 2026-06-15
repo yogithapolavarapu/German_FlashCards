@@ -139,7 +139,6 @@
     gap: 12px;
     margin-bottom: 1.5rem;
   }
-
   .stat {
     background: var(--card);
     border: 1px solid var(--border);
@@ -412,6 +411,9 @@
     display: flex;
     gap: 8px;
     margin-bottom: 1rem;
+    margin-top: 0.25rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
   }
 
   .add-form input {
@@ -442,7 +444,7 @@
     background: var(--card);
     color: var(--ink);
     margin-top: 8px;
-    margin-bottom: 1rem;
+    margin-bottom: 0.5rem;
   }
 
   .example-input:focus {
@@ -962,9 +964,51 @@
     </div>
   </header>
 
+  <!-- 1. Flashcard — main focus -->
+  <div class="card-zone" id="cardZone">
+    <div class="empty-state">Loading your deck&hellip;</div>
+  </div>
 
+  <!-- 2. Grade buttons — immediately under card -->
+  <div class="grade-row hidden" id="gradeRow">
+    <button data-q="1">Hard</button>
+    <button data-q="2">Moderate</button>
+    <button data-q="3">Easy</button>
+  </div>
 
+  <!-- 3. Secondary actions row -->
+  <div class="toolbar" style="margin-bottom:0.75rem;">
+    <button id="shuffleBtn" title="Shuffle deck order">
+      <i class="ti ti-arrows-shuffle" aria-hidden="true"></i> Shuffle
+    </button>
+    <button id="quizBtn" title="Quiz mode">
+      <i class="ti ti-help" aria-hidden="true"></i> Quiz
+    </button>
+    <button id="challengeBtn" title="Challenge a friend" style="position:relative;">
+      <i class="ti ti-bolt" aria-hidden="true"></i> Challenge
+      <span id="challengeBadge" style="display:none;position:absolute;top:-6px;right:-6px;background:var(--red);color:#fff;font-size:10px;font-weight:700;border-radius:999px;min-width:16px;height:16px;line-height:16px;text-align:center;padding:0 3px;"></span>
+    </button>
+    <div class="toolbar-group">
+      <span class="toolbar-label">Send to deck:</span>
+      <button data-send="1">Hard</button>
+      <button data-send="2">Moderate</button>
+      <button data-send="3">Easy</button>
+    </div>
+  </div>
 
+  <!-- 5. Add a card -->
+  <form class="add-form" id="addForm">
+    <input id="frontInput" placeholder="German word" autocomplete="off" required />
+    <input id="backInput" placeholder="English meaning" autocomplete="off" required />
+    <button type="submit" id="addBtn">Add</button>
+  </form>
+  <input id="exampleInput" class="example-input" placeholder="Example sentence (optional)" autocomplete="off" />
+  <input id="notesInput" class="example-input" placeholder="Notes (e.g. die, plural: Häuser)" autocomplete="off" />
+  <p class="status-line" id="statusLine"></p>
+
+  <hr style="border:none;border-top:1px solid var(--border);margin:0.5rem 0 0.75rem;">
+
+  <!-- 6. Stats -->
   <div class="stats">
     <div class="stat due">
       <p class="stat-label">Practiced</p>
@@ -980,46 +1024,7 @@
     </div>
   </div>
 
-  <div class="card-zone" id="cardZone">
-    <div class="empty-state">Loading your deck&hellip;</div>
-  </div>
-  <div class="toolbar" style="margin-bottom:0.5rem;">
-    <button id="shuffleBtn" title="Shuffle deck order">
-      <i class="ti ti-arrows-shuffle" aria-hidden="true"></i> Shuffle
-    </button>
-    <button id="quizBtn" title="Quiz mode">
-      <i class="ti ti-help" aria-hidden="true"></i> Quiz
-    </button>
-    <button id="challengeBtn" title="Challenge a friend" style="position:relative;">
-      <i class="ti ti-bolt" aria-hidden="true"></i> Challenge
-      <span id="challengeBadge" style="display:none;position:absolute;top:-6px;right:-6px;background:var(--red);color:#fff;font-size:10px;font-weight:700;border-radius:999px;min-width:16px;height:16px;line-height:16px;text-align:center;padding:0 3px;"></span>
-    </button>
-  </div>
-
-  <div class="grade-row hidden" id="gradeRow">
-    <button data-q="1">Hard</button>
-    <button data-q="2">Moderate</button>
-    <button data-q="3">Easy</button>
-  </div>
-
-  <div class="toolbar">
-    <div class="toolbar-group">
-      <span class="toolbar-label">Send to deck:</span>
-      <button data-send="1">Hard</button>
-      <button data-send="2">Moderate</button>
-      <button data-send="3">Easy</button>
-    </div>
-  </div>
-
-  <form class="add-form" id="addForm">
-    <input id="frontInput" placeholder="German word" autocomplete="off" required />
-    <input id="backInput" placeholder="English meaning" autocomplete="off" required />
-    <button type="submit" id="addBtn">Add</button>
-  </form>
-  <input id="exampleInput" class="example-input" placeholder="Example sentence (optional)" autocomplete="off" />
-  <input id="notesInput" class="example-input" placeholder="Notes (e.g. die, plural: Häuser)" autocomplete="off" />
-  <p class="status-line" id="statusLine"></p>
-
+  <!-- 6. Your deck (collapsed) -->
   <button class="section-toggle" id="deckToggle" type="button">
     <i class="ti ti-chevron-down" aria-hidden="true"></i> Your deck
   </button>
@@ -1028,6 +1033,7 @@
     <div class="deck-list" id="deckList"></div>
   </div>
 
+  <!-- 7. Activity (collapsed) -->
   <button class="section-toggle" id="chartToggle" type="button">
     <i class="ti ti-chevron-down" aria-hidden="true"></i> Activity
   </button>
