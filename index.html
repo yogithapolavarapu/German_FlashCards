@@ -72,6 +72,47 @@
     flex-shrink: 0;
   }
 
+  .challenge-banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--gold-soft);
+    border: 1px solid var(--gold);
+    border-radius: 10px;
+    padding: 0.6rem 0.85rem;
+    font-size: 0.85rem;
+    color: var(--ink);
+    margin-bottom: 1.25rem;
+  }
+
+  .challenge-banner.hidden { display: none; }
+
+  .challenge-banner span { flex: 1; }
+
+  .challenge-banner button {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 600;
+    border: none;
+    border-radius: 6px;
+    padding: 4px 10px;
+    cursor: pointer;
+  }
+
+  #challengeBannerBtn {
+    background: var(--gold);
+    color: #fff;
+  }
+
+  #challengeBannerDismiss {
+    background: none;
+    color: var(--ink-soft);
+    font-size: 1rem;
+    padding: 2px 6px;
+  }
+
+  #challengeBannerDismiss:hover { color: var(--ink); }
+
   #themeToggle {
     background: var(--card);
     border: 1px solid var(--border);
@@ -962,6 +1003,12 @@
     </div>
   </header>
 
+  <div class="challenge-banner hidden" id="challengeBanner">
+    <span id="challengeBannerText">🎯 You have a challenge waiting!</span>
+    <button id="challengeBannerBtn">View</button>
+    <button id="challengeBannerDismiss" aria-label="Dismiss">&times;</button>
+  </div>
+
   <div class="stats">
     <div class="stat due">
       <p class="stat-label">Practiced</p>
@@ -1819,32 +1866,51 @@ async function showChallengeResult(challenge, card) {
   if (challengeChannel) { sb.removeChannel(challengeChannel); challengeChannel = null; }
 }
 
+let pendingChallengeData = null;
+
+function showChallengeBanner(challengerName) {
+  const banner = document.getElementById('challengeBanner');
+  document.getElementById('challengeBannerText').textContent = `🎯 ${challengerName} challenges you!`;
+  banner.classList.remove('hidden');
+}
+
+function hideChallengeBanner() {
+  document.getElementById('challengeBanner').classList.add('hidden');
+  pendingChallengeData = null;
+}
+
 async function checkPendingChallenge() {
   const { data } = await sb.from('challenges').select('*, cards(*)').eq('invited', profile).eq('status', 'pending').order('created_at', { ascending: false }).limit(1).maybeSingle();
   if (data) {
-    activeChallengeId = data.id;
-    challengeRole = 'opponent';
-    challengeCardId = data.card_id;
-    showOpponentChallenge(data);
+    pendingChallengeData = data;
+    showChallengeBanner(data.created_by);
   }
-  // Also subscribe for future incoming challenges
   subscribeIncomingChallenges();
 }
 
 function subscribeIncomingChallenges() {
-  const incomingChannel = sb.channel('incoming-challenges-' + profile)
+  sb.channel('incoming-challenges-' + profile)
     .on('postgres_changes', {
       event: 'INSERT', schema: 'public', table: 'challenges',
       filter: `invited=eq.${profile}`
     }, async payload => {
-      // Fetch full challenge with card
       const { data } = await sb.from('challenges').select('*, cards(*)').eq('id', payload.new.id).single();
       if (data && data.status === 'pending') {
-        showOpponentChallenge(data);
+        pendingChallengeData = data;
+        showChallengeBanner(data.created_by);
       }
     })
     .subscribe();
 }
+
+document.getElementById('challengeBannerBtn').addEventListener('click', () => {
+  if (pendingChallengeData) {
+    hideChallengeBanner();
+    showOpponentChallenge(pendingChallengeData);
+  }
+});
+
+document.getElementById('challengeBannerDismiss').addEventListener('click', hideChallengeBanner);
 
 function showOpponentChallenge(challenge) {
   const card = challenge.cards;
