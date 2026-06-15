@@ -199,6 +199,7 @@
 
   .card-zone {
     perspective: 1200px;
+    perspective-origin: center;
     margin-bottom: 1.5rem;
     height: 180px;
   }
@@ -208,6 +209,7 @@
     width: 100%;
     height: 180px;
     cursor: pointer;
+    transform-style: preserve-3d;
   }
 
   .flip-inner {
@@ -226,6 +228,7 @@
     position: absolute;
     inset: 0;
     backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
     background: var(--card);
     border: 1px solid var(--border);
     border-radius: 14px;
@@ -235,7 +238,6 @@
     justify-content: center;
     text-align: center;
     padding: 1.5rem;
-    overflow: hidden;
   }
 
   .face .lang {
@@ -2674,7 +2676,7 @@ document.getElementById('editProfileOverlay').addEventListener('click', (e) => {
   if (e.target.id === 'editProfileOverlay') closeEditProfileModal();
 });
 
-const EMOJI_OPTIONS = ['🍀','👩‍💻','🐶','🐧','🐻','🐝','🦕','🐳','🦢','🪴','🪐','🎆','🌄','🌃'];
+const EMOJI_OPTIONS = ['🍀','🐶','🐻','🐝','🦕','🪴','🌄'];
 const THEME_COLORS = ['#3A5A78','#B5564A','#C99A3B','#5B8BAE','#9C6ADE','#E07A5F','#4A9D8A','#D4518A'];
 
 let selectedEmoji = EMOJI_OPTIONS[0];
