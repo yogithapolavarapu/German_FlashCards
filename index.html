@@ -760,6 +760,90 @@
     background: var(--btn-hover);
   }
 
+  .quiz-modal { max-width: 420px; }
+
+  .quiz-question {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.3rem;
+    font-weight: 700;
+    text-align: center;
+    margin: 0.5rem 0 1.25rem;
+  }
+
+  .quiz-options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 1rem;
+  }
+
+  .quiz-option {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.9rem;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--ink);
+    border-radius: 8px;
+    padding: 0.7rem 0.5rem;
+    cursor: pointer;
+    text-align: center;
+    transition: background 0.15s;
+  }
+
+  .quiz-option:hover { background: var(--accent-soft); border-color: var(--accent); }
+  .quiz-option.correct { background: var(--gold-soft); border-color: var(--gold); color: var(--ink); }
+  .quiz-option.wrong { background: var(--red-soft); border-color: var(--red); color: var(--ink); }
+  .quiz-option:disabled { cursor: default; }
+
+  .quiz-result {
+    text-align: center;
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin: 0;
+  }
+
+  .quiz-result.correct-msg { color: var(--gold); }
+  .quiz-result.wrong-msg { color: var(--red); }
+
+  .challenge-profile-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 0.5rem 0 1rem;
+  }
+
+  .challenge-profile-list button {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.9rem;
+    text-align: left;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--ink);
+    border-radius: 8px;
+    padding: 0.6rem 0.85rem;
+    cursor: pointer;
+  }
+
+  .challenge-profile-list button:hover {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+
+  .challenge-waiting {
+    text-align: center;
+    padding: 1rem 0;
+    color: var(--ink-soft);
+    font-size: 0.9rem;
+  }
+
+  .challenge-card {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.4rem;
+    font-weight: 700;
+    text-align: center;
+    margin: 0.5rem 0 1.25rem;
+  }
+
   .profile-list {
     display: flex;
     flex-direction: column;
@@ -869,7 +953,7 @@
   <header>
     <div>
       <h1>vokabel<span>karten</span></h1>
-      <p class="subtitle">German vocabulary, spaced repetition &middot; <span id="profileLabel"></span> &middot; <a href="#" id="switchProfileLink">switch</a></p>
+      <p class="subtitle"><span id="profileLabel"></span> &middot; <a href="#" id="switchProfileLink">switch</a></p>
     </div>
     <div class="header-actions">
       <button id="themeToggle" aria-label="Toggle dark mode" title="Toggle dark mode">
@@ -905,6 +989,12 @@
   <div class="toolbar">
     <button id="shuffleBtn" title="Shuffle deck order">
       <i class="ti ti-arrows-shuffle" aria-hidden="true"></i> Shuffle
+    </button>
+    <button id="quizBtn" title="Quiz mode">
+      <i class="ti ti-help" aria-hidden="true"></i> Quiz
+    </button>
+    <button id="challengeBtn" title="Challenge a friend">
+      <i class="ti ti-bolt" aria-hidden="true"></i> Challenge
     </button>
     <div class="toolbar-group">
       <span class="toolbar-label">Send to deck:</span>
@@ -979,6 +1069,48 @@
     </div>
   </div>
 </div>
+
+<!-- Quiz modal -->
+<div class="modal-overlay hidden" id="quizOverlay">
+  <div class="modal quiz-modal">
+    <p class="modal-title">Quiz mode</p>
+    <p class="quiz-question" id="quizQuestion"></p>
+    <div class="quiz-options" id="quizOptions"></div>
+    <p class="quiz-result hidden" id="quizResult"></p>
+    <div class="modal-actions">
+      <button id="quizCloseBtn" type="button">Close</button>
+      <button id="quizNextBtn" type="button" class="primary hidden">Next</button>
+    </div>
+  </div>
+</div>
+
+<!-- Challenge modal -->
+<div class="modal-overlay hidden" id="challengeOverlay">
+  <div class="modal">
+    <p class="modal-title" id="challengeTitle">Challenge a friend</p>
+    <div id="challengeBody"></div>
+    <div class="modal-actions">
+      <button id="challengeCloseBtn" type="button">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- All done overlay -->
+<div class="modal-overlay hidden" id="allDoneOverlay">
+  <div class="modal" style="text-align:center;">
+    <p style="font-size:2rem; margin:0 0 8px;">🎉</p>
+    <p class="modal-title">You practiced everything!</p>
+    <p style="font-size:0.9rem; color:var(--ink-soft); margin:0 0 1.5rem;">Great session. Shuffle and go again?</p>
+    <div class="modal-actions" style="justify-content:center;">
+      <button id="allDoneCloseBtn" type="button">Not now</button>
+      <button id="allDoneShuffleBtn" type="button" class="primary">Shuffle &amp; restart</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confetti canvas -->
+<canvas id="confettiCanvas" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:999;"></canvas>
+
 
 <div class="modal-overlay hidden" id="editOverlay">
   <div class="modal">
@@ -1129,6 +1261,7 @@ async function addCard(front, back, example, notes) {
     return;
   }
   cards.push(data[0]);
+  checkMilestone(cards.length);
   setStatus('Saved.');
   render();
 }
@@ -1256,6 +1389,10 @@ function renderCardZone() {
         return;
       }
     } else {
+      // All cards practiced — show celebration
+      if (cards.length > 0 && getPracticedCards().length === cards.length) {
+        showAllDone();
+      }
       zone.innerHTML = `
         <div class="empty-state">
           <p style="margin:0 0 12px;">Nothing due right now. Practice by difficulty instead:</p>
@@ -1404,6 +1541,246 @@ document.getElementById('addForm').addEventListener('submit', async (e) => {
     notesInput.value = '';
     frontInput.focus();
   }
+});
+
+// ── Confetti ──────────────────────────────────────────────
+function launchConfetti(duration = 2500) {
+  const canvas = document.getElementById('confettiCanvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  const pieces = Array.from({ length: 120 }, () => ({
+    x: Math.random() * canvas.width,
+    y: Math.random() * -canvas.height,
+    r: 4 + Math.random() * 6,
+    d: 1 + Math.random() * 2,
+    color: ['#C99A3B','#3A5A78','#B5564A','#7DD3A8','#9C6ADE'][Math.floor(Math.random() * 5)],
+    tilt: Math.random() * 10 - 5,
+    tiltSpeed: 0.1 + Math.random() * 0.2
+  }));
+  const end = Date.now() + duration;
+  function frame() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    pieces.forEach(p => {
+      p.y += p.d;
+      p.tilt += p.tiltSpeed;
+      ctx.beginPath();
+      ctx.ellipse(p.x + p.tilt, p.y, p.r, p.r * 0.4, p.tilt, 0, 2 * Math.PI);
+      ctx.fillStyle = p.color;
+      ctx.fill();
+      if (p.y > canvas.height) { p.y = -10; p.x = Math.random() * canvas.width; }
+    });
+    if (Date.now() < end) requestAnimationFrame(frame);
+    else ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+  frame();
+}
+
+const MILESTONES = [1, 10, 50, 100];
+function checkMilestone(count) {
+  if (MILESTONES.includes(count) || (count >= 1000 && count % 1000 === 0)) {
+    launchConfetti();
+    const msgs = { 1: 'First card added! 🎉', 10: '10 cards — you\'re building a deck! 🚀', 50: '50 cards — serious learner! 🌟', 100: '100 cards! You\'re unstoppable! 🏆' };
+    const msg = msgs[count] || `${count} cards! Incredible! 🎊`;
+    setStatus(msg);
+  }
+}
+
+// ── All done ──────────────────────────────────────────────
+function showAllDone() {
+  launchConfetti(3500);
+  document.getElementById('allDoneOverlay').classList.remove('hidden');
+}
+
+document.getElementById('allDoneCloseBtn').addEventListener('click', () => {
+  document.getElementById('allDoneOverlay').classList.add('hidden');
+});
+
+document.getElementById('allDoneShuffleBtn').addEventListener('click', async () => {
+  document.getElementById('allDoneOverlay').classList.add('hidden');
+  document.getElementById('shuffleBtn').click();
+});
+
+// ── Quiz mode ─────────────────────────────────────────────
+let quizCard = null;
+let quizAnswered = false;
+
+function openQuiz() {
+  if (cards.length < 4) { setStatus('Need at least 4 cards to quiz.'); return; }
+  quizAnswered = false;
+  quizCard = cards[Math.floor(Math.random() * cards.length)];
+  const wrongs = cards.filter(c => c.id !== quizCard.id);
+  const options = [quizCard.back];
+  while (options.length < 4) {
+    const pick = wrongs[Math.floor(Math.random() * wrongs.length)].back;
+    if (!options.includes(pick)) options.push(pick);
+  }
+  options.sort(() => Math.random() - 0.5);
+  document.getElementById('quizQuestion').textContent = quizCard.front;
+  const optEl = document.getElementById('quizOptions');
+  optEl.innerHTML = options.map(o => `<button class="quiz-option" data-answer="${escapeHtml(o)}">${escapeHtml(o)}</button>`).join('');
+  optEl.querySelectorAll('.quiz-option').forEach(b => {
+    b.addEventListener('click', () => {
+      if (quizAnswered) return;
+      quizAnswered = true;
+      const correct = b.dataset.answer === quizCard.back;
+      b.classList.add(correct ? 'correct' : 'wrong');
+      optEl.querySelectorAll('.quiz-option').forEach(btn => {
+        btn.disabled = true;
+        if (btn.dataset.answer === quizCard.back) btn.classList.add('correct');
+      });
+      const result = document.getElementById('quizResult');
+      result.textContent = correct ? '✓ Correct!' : `✗ It was "${quizCard.back}"`;
+      result.className = 'quiz-result ' + (correct ? 'correct-msg' : 'wrong-msg');
+      result.classList.remove('hidden');
+      document.getElementById('quizNextBtn').classList.remove('hidden');
+    });
+  });
+  document.getElementById('quizResult').className = 'quiz-result hidden';
+  document.getElementById('quizNextBtn').classList.add('hidden');
+  document.getElementById('quizOverlay').classList.remove('hidden');
+}
+
+document.getElementById('quizBtn').addEventListener('click', openQuiz);
+document.getElementById('quizCloseBtn').addEventListener('click', () => {
+  document.getElementById('quizOverlay').classList.add('hidden');
+});
+document.getElementById('quizNextBtn').addEventListener('click', openQuiz);
+
+// ── Challenge mode ────────────────────────────────────────
+let challengeChannel = null;
+let activeChallengeId = null;
+let challengeRole = null;
+let challengeCardId = null;
+
+async function fetchOtherProfiles() {
+  const { data } = await sb.from('streaks').select('profile, avatar_emoji');
+  return (data || []).filter(p => p.profile !== profile);
+}
+
+function openChallengePicker() {
+  const overlay = document.getElementById('challengeOverlay');
+  const body = document.getElementById('challengeBody');
+  document.getElementById('challengeTitle').textContent = 'Challenge a friend';
+  fetchOtherProfiles().then(others => {
+    if (others.length === 0) {
+      body.innerHTML = '<p class="challenge-waiting">No other profiles yet. Share the app with friends first!</p>';
+    } else {
+      body.innerHTML = `<p style="font-size:0.85rem;color:var(--ink-soft);margin:0 0 8px;">Pick a profile to challenge:</p>
+        <div class="challenge-profile-list">${others.map(p =>
+          `<button data-profile="${escapeHtml(p.profile)}">${p.avatar_emoji || ''} ${escapeHtml(p.profile)}</button>`
+        ).join('')}</div>`;
+      body.querySelectorAll('button[data-profile]').forEach(b => {
+        b.addEventListener('click', () => startChallenge(b.dataset.profile));
+      });
+    }
+  });
+  overlay.classList.remove('hidden');
+}
+
+async function startChallenge(opponent) {
+  if (cards.length === 0) { setStatus('Add cards first.'); return; }
+  const card = cards[Math.floor(Math.random() * cards.length)];
+  challengeCardId = card.id;
+  challengeRole = 'challenger';
+  const { data, error } = await sb.from('challenges').insert({
+    created_by: profile, invited: opponent, card_id: card.id, status: 'pending'
+  }).select().single();
+  if (error) { setStatus('Could not start challenge.'); return; }
+  activeChallengeId = data.id;
+  showChallengeWaiting(card, opponent, data.id);
+}
+
+function showChallengeWaiting(card, opponent, challengeId) {
+  const body = document.getElementById('challengeBody');
+  document.getElementById('challengeTitle').textContent = 'Waiting for opponent…';
+  body.innerHTML = `
+    <p class="challenge-waiting">Challenge sent to <strong>${escapeHtml(opponent)}</strong>!</p>
+    <p class="challenge-card">${escapeHtml(card.front)}</p>
+    <p class="challenge-waiting" style="font-size:0.8rem;">Waiting for them to guess…</p>
+  `;
+  subscribeToChallenge(challengeId, card);
+}
+
+function subscribeToChallenge(challengeId, card) {
+  if (challengeChannel) sb.removeChannel(challengeChannel);
+  challengeChannel = sb.channel('challenge-' + challengeId)
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'challenges', filter: `id=eq.${challengeId}` }, payload => {
+      showChallengeResult(payload.new, card);
+    })
+    .subscribe();
+}
+
+async function showChallengeResult(challenge, card) {
+  const body = document.getElementById('challengeBody');
+  document.getElementById('challengeTitle').textContent = 'Result!';
+  const won = challenge.winner === profile;
+  body.innerHTML = `
+    <p style="text-align:center;font-size:1.8rem;margin:0.5rem 0;">${won ? '🏆' : '😅'}</p>
+    <p class="challenge-card">${escapeHtml(card ? card.front : '')}</p>
+    <p style="text-align:center;font-size:0.9rem;color:var(--ink-soft);">Answer: <strong>${escapeHtml(card ? card.back : '')}</strong></p>
+    <p style="text-align:center;font-size:0.9rem;font-weight:600;color:${won ? 'var(--gold)' : 'var(--red)'};">${won ? '🎉 You won!' : `${escapeHtml(challenge.winner)} got it first!`}</p>
+  `;
+  if (won) launchConfetti(2000);
+  if (challengeChannel) { sb.removeChannel(challengeChannel); challengeChannel = null; }
+}
+
+async function checkPendingChallenge() {
+  const { data } = await sb.from('challenges').select('*, cards(*)').eq('invited', profile).eq('status', 'pending').order('created_at', { ascending: false }).limit(1).maybeSingle();
+  if (!data) return;
+  activeChallengeId = data.id;
+  challengeRole = 'opponent';
+  challengeCardId = data.card_id;
+  showOpponentChallenge(data);
+}
+
+function showOpponentChallenge(challenge) {
+  const card = challenge.cards;
+  if (!card || cards.length < 4) return;
+  const overlay = document.getElementById('challengeOverlay');
+  const body = document.getElementById('challengeBody');
+  document.getElementById('challengeTitle').textContent = `${escapeHtml(challenge.created_by)} challenges you!`;
+  const wrongs = cards.filter(c => c.id !== card.id);
+  const options = [card.back];
+  const pool = [...wrongs];
+  while (options.length < 4 && pool.length > 0) {
+    const idx = Math.floor(Math.random() * pool.length);
+    const pick = pool.splice(idx, 1)[0].back;
+    if (!options.includes(pick)) options.push(pick);
+  }
+  options.sort(() => Math.random() - 0.5);
+  body.innerHTML = `
+    <p class="challenge-card">${escapeHtml(card.front)}</p>
+    <div class="quiz-options">${options.map(o => `<button class="quiz-option" data-answer="${escapeHtml(o)}">${escapeHtml(o)}</button>`).join('')}</div>
+    <p class="quiz-result hidden" id="challengeAnswerResult"></p>
+  `;
+  body.querySelectorAll('.quiz-option').forEach(b => {
+    b.addEventListener('click', async () => {
+      body.querySelectorAll('.quiz-option').forEach(btn => {
+        btn.disabled = true;
+        if (btn.dataset.answer === card.back) btn.classList.add('correct');
+      });
+      const correct = b.dataset.answer === card.back;
+      if (!correct) b.classList.add('wrong');
+      await sb.from('challenges').update({
+        status: 'answered', winner: correct ? profile : challenge.created_by
+      }).eq('id', challenge.id);
+      const res = document.getElementById('challengeAnswerResult');
+      if (res) {
+        res.textContent = correct ? '✓ Correct! Result sent!' : `✗ Wrong! Answer: "${card.back}"`;
+        res.className = 'quiz-result ' + (correct ? 'correct-msg' : 'wrong-msg');
+        res.classList.remove('hidden');
+      }
+      if (correct) launchConfetti(2000);
+    });
+  });
+  overlay.classList.remove('hidden');
+}
+
+document.getElementById('challengeBtn').addEventListener('click', openChallengePicker);
+document.getElementById('challengeCloseBtn').addEventListener('click', () => {
+  document.getElementById('challengeOverlay').classList.add('hidden');
+  if (challengeChannel) { sb.removeChannel(challengeChannel); challengeChannel = null; }
 });
 
 document.getElementById('shuffleBtn').addEventListener('click', async () => {
@@ -1775,6 +2152,7 @@ document.getElementById('switchProfileLink').addEventListener('click', (e) => {
   try { saved = localStorage.getItem('vokabelkarten-profile') || ''; } catch (e) {}
   if (saved) {
     await selectProfile(saved);
+    await checkPendingChallenge();
   } else {
     await showProfilePicker();
   }
