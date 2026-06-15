@@ -1006,6 +1006,7 @@
   <div class="challenge-banner hidden" id="challengeBanner">
     <span id="challengeBannerText">🎯 You have a challenge waiting!</span>
     <button id="challengeBannerBtn">View</button>
+    <button id="challengeBannerNext" style="display:none;">Next</button>
     <button id="challengeBannerDismiss" aria-label="Dismiss">&times;</button>
   </div>
 
@@ -1846,12 +1847,9 @@ function openChallengePicker(specificCard) {
     let selectedCard = specificCard || null;
     const cardSection = specificCard
       ? `<p style="font-size:0.85rem;color:var(--ink-soft);margin:0 0 10px;">Challenging with: <strong>${escapeHtml(specificCard.front)}</strong></p>`
-      : `<p style="font-size:0.85rem;color:var(--ink-soft);margin:0 0 6px;">Pick a word to challenge with:</p>
-         <div class="deck-list" style="max-height:160px;overflow-y:auto;margin-bottom:10px;" id="challengeCardList">
-           ${cards.map(c => `<div class="deck-item" style="cursor:pointer;" data-id="${c.id}">
-             <div class="pair"><span class="de">${escapeHtml(c.front)}</span><span class="en"> — ${escapeHtml(c.back)}</span></div>
-           </div>`).join('')}
-         </div>`;
+      : `<p style="font-size:0.85rem;color:var(--ink-soft);margin:0 0 6px;">Search a word to challenge with (or leave blank for random):</p>
+         <input id="challengeCardSearch" autocomplete="off" placeholder="Type a German word…" style="width:100%;font-family:'Inter',sans-serif;font-size:0.9rem;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--ink);margin-bottom:6px;">
+         <div id="challengeCardResults" style="max-height:140px;overflow-y:auto;margin-bottom:10px;"></div>`;
     body.innerHTML = `${cardSection}
       <p style="font-size:0.85rem;color:var(--ink-soft);margin:0 0 6px;">Challenge who?</p>
       <div class="challenge-profile-list">${others.map(p =>
@@ -1859,13 +1857,30 @@ function openChallengePicker(specificCard) {
       ).join('')}</div>`;
 
     if (!specificCard) {
-      body.querySelectorAll('#challengeCardList .deck-item').forEach(row => {
-        row.addEventListener('click', () => {
-          body.querySelectorAll('#challengeCardList .deck-item').forEach(r => r.style.background = '');
-          row.style.background = 'var(--accent-soft)';
-          selectedCard = cards.find(c => String(c.id) === row.dataset.id) || null;
+      const searchInput = body.querySelector('#challengeCardSearch');
+      const resultsEl = body.querySelector('#challengeCardResults');
+      if (searchInput && resultsEl) {
+        searchInput.addEventListener('input', () => {
+          const q = searchInput.value.trim().toLowerCase();
+          if (!q) { resultsEl.innerHTML = ''; selectedCard = null; return; }
+          const matches = cards.filter(c =>
+            c.front.toLowerCase().includes(q) || c.back.toLowerCase().includes(q)
+          ).slice(0, 5);
+          resultsEl.innerHTML = matches.map(c =>
+            `<div class="deck-item" style="cursor:pointer;" data-id="${c.id}">
+              <div class="pair"><span class="de">${escapeHtml(c.front)}</span><span class="en"> — ${escapeHtml(c.back)}</span></div>
+            </div>`
+          ).join('');
+          resultsEl.querySelectorAll('.deck-item').forEach(row => {
+            row.addEventListener('click', () => {
+              resultsEl.querySelectorAll('.deck-item').forEach(r => r.style.background = '');
+              row.style.background = 'var(--accent-soft)';
+              selectedCard = cards.find(c => String(c.id) === row.dataset.id) || null;
+              if (selectedCard) searchInput.value = selectedCard.front;
+            });
+          });
         });
-      });
+      }
     }
 
     body.querySelectorAll('button[data-profile]').forEach(b => {
@@ -1924,29 +1939,47 @@ async function showChallengeResult(challenge, card) {
   if (challengeChannel) { sb.removeChannel(challengeChannel); challengeChannel = null; }
 }
 
-let pendingChallengeData = null;
+let pendingChallenges = [];
+let pendingChallengeIndex = 0;
 
-function showChallengeBanner(challengerName) {
+function updateChallengeBanner() {
   const banner = document.getElementById('challengeBanner');
-  document.getElementById('challengeBannerText').textContent = `🎯 ${challengerName} challenges you!`;
+  const text = document.getElementById('challengeBannerText');
+  const nextBtn = document.getElementById('challengeBannerNext');
+  if (pendingChallenges.length === 0) {
+    banner.classList.add('hidden');
+    return;
+  }
+  const c = pendingChallenges[pendingChallengeIndex];
+  const total = pendingChallenges.length;
+  const countStr = total > 1 ? ` (${pendingChallengeIndex + 1}/${total})` : '';
+  text.textContent = `🎯 ${c.created_by} challenges you!${countStr}`;
+  nextBtn.style.display = total > 1 ? 'inline-block' : 'none';
   banner.classList.remove('hidden');
 }
 
+async function addPendingChallenge(data) {
+  if (data.card_id) {
+    const { data: cardData } = await sb.from('cards').select('*').eq('id', data.card_id).single();
+    data.cards = cardData;
+  }
+  // avoid duplicates
+  if (!pendingChallenges.find(c => c.id === data.id)) {
+    pendingChallenges.push(data);
+  }
+  updateChallengeBanner();
+}
+
 function hideChallengeBanner() {
+  pendingChallenges = [];
+  pendingChallengeIndex = 0;
   document.getElementById('challengeBanner').classList.add('hidden');
-  pendingChallengeData = null;
 }
 
 async function checkPendingChallenge() {
-  const { data } = await sb.from('challenges').select('*').eq('invited', profile).eq('status', 'pending').order('created_at', { ascending: false }).limit(1).maybeSingle();
-  if (data) {
-    // Fetch card separately
-    if (data.card_id) {
-      const { data: cardData } = await sb.from('cards').select('*').eq('id', data.card_id).single();
-      data.cards = cardData;
-    }
-    pendingChallengeData = data;
-    showChallengeBanner(data.created_by);
+  const { data } = await sb.from('challenges').select('*').eq('invited', profile).eq('status', 'pending').order('created_at', { ascending: false });
+  if (data && data.length > 0) {
+    for (const d of data) await addPendingChallenge(d);
   }
   subscribeIncomingChallenges();
 }
@@ -1959,22 +1992,25 @@ function subscribeIncomingChallenges() {
     }, async payload => {
       const { data } = await sb.from('challenges').select('*').eq('id', payload.new.id).single();
       if (data && data.status === 'pending') {
-        if (data.card_id) {
-          const { data: cardData } = await sb.from('cards').select('*').eq('id', data.card_id).single();
-          data.cards = cardData;
-        }
-        pendingChallengeData = data;
-        showChallengeBanner(data.created_by);
+        await addPendingChallenge(data);
       }
     })
     .subscribe();
 }
 
 document.getElementById('challengeBannerBtn').addEventListener('click', async () => {
-  if (pendingChallengeData) {
-    hideChallengeBanner();
-    await showOpponentChallenge(pendingChallengeData);
+  const c = pendingChallenges[pendingChallengeIndex];
+  if (c) {
+    pendingChallenges.splice(pendingChallengeIndex, 1);
+    pendingChallengeIndex = Math.min(pendingChallengeIndex, pendingChallenges.length - 1);
+    updateChallengeBanner();
+    await showOpponentChallenge(c);
   }
+});
+
+document.getElementById('challengeBannerNext').addEventListener('click', () => {
+  pendingChallengeIndex = (pendingChallengeIndex + 1) % pendingChallenges.length;
+  updateChallengeBanner();
 });
 
 document.getElementById('challengeBannerDismiss').addEventListener('click', hideChallengeBanner);
