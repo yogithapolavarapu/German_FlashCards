@@ -1048,6 +1048,42 @@
     display: none !important;
   }
 
+  body:not(.basic-mode) #basicDeckPicker {
+    display: none !important;
+  }
+
+  .basic-deck-picker {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 1rem;
+  }
+
+  .basic-deck-btn {
+    flex: 1;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 500;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--ink-soft);
+    border-radius: 8px;
+    padding: 0.6rem;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .basic-deck-btn.active {
+    background: var(--accent);
+    color: var(--btn-text);
+    border-color: var(--accent);
+    font-weight: 600;
+  }
+
+  .basic-deck-btn:not(.active):hover {
+    border-color: var(--accent);
+    color: var(--ink);
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .flip-inner { transition: none; }
   }
@@ -1140,8 +1176,14 @@
     </div>
   </div>
 
-  <!-- 5. Add a card (Basic: simple, Fun: with example/notes) -->
-  <form class="add-form" id="addForm">
+  <!-- Basic mode: deck picker -->
+  <div id="basicDeckPicker" class="basic-deck-picker">
+    <button id="basicMyDeckBtn" class="basic-deck-btn active">My deck</button>
+    <button id="basicAllBtn" class="basic-deck-btn">Everyone's deck</button>
+  </div>
+
+  <!-- 5. Add a card (Fun mode only) -->
+  <form class="add-form fun-only" id="addForm">
     <input id="frontInput" placeholder="German word" autocomplete="off" required />
     <input id="backInput" placeholder="English meaning" autocomplete="off" required />
     <button type="submit" id="addBtn">Add</button>
@@ -1576,8 +1618,8 @@ function renderCardZone() {
   const zone = document.getElementById('cardZone');
   const gradeRow = document.getElementById('gradeRow');
 
-  // Basic mode uses consolidated all-cards pool
-  const cardPool = !funMode && allCards.length > 0 ? allCards : cards;
+  // Basic mode uses selected pool
+  const cardPool = !funMode ? (basicUseAllCards && allCards.length > 0 ? allCards : cards) : cards;
 
   if (cardPool.length === 0) {
     zone.innerHTML = '<div class="empty-state">You haven\'t added anything yet. Start now to practice.</div>';
@@ -2387,6 +2429,26 @@ initTheme();
 
 // ── Basic / Fun mode toggle ───────────────────────────────
 let funMode = false;
+let basicUseAllCards = false;
+
+document.getElementById('basicMyDeckBtn').addEventListener('click', () => {
+  basicUseAllCards = false;
+  document.getElementById('basicMyDeckBtn').classList.add('active');
+  document.getElementById('basicAllBtn').classList.remove('active');
+  flipped = false;
+  currentCard = null;
+  render();
+});
+
+document.getElementById('basicAllBtn').addEventListener('click', async () => {
+  basicUseAllCards = true;
+  document.getElementById('basicAllBtn').classList.add('active');
+  document.getElementById('basicMyDeckBtn').classList.remove('active');
+  await fetchAllCards();
+  flipped = false;
+  currentCard = null;
+  render();
+});
 
 async function applyMode(fun) {
   funMode = fun;
@@ -2404,8 +2466,9 @@ async function applyMode(fun) {
     typeMode = false;
     masteredMode = false;
     showTypeInput(false);
-    // Load all cards for basic mode
-    await fetchAllCards();
+    basicUseAllCards = false;
+    document.getElementById('basicMyDeckBtn').classList.add('active');
+    document.getElementById('basicAllBtn').classList.remove('active');
   }
   flipped = false;
   currentCard = null;
