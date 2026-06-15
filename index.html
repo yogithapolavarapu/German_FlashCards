@@ -1976,8 +1976,11 @@ async function checkPendingChallenge() {
   subscribeIncomingChallenges();
 }
 
+let incomingChannel = null;
+
 function subscribeIncomingChallenges() {
-  sb.channel('incoming-challenges-' + profile)
+  if (incomingChannel) { sb.removeChannel(incomingChannel); incomingChannel = null; }
+  incomingChannel = sb.channel('incoming-challenges-' + profile)
     .on('postgres_changes', {
       event: 'INSERT', schema: 'public', table: 'challenges',
       filter: `invited=eq.${profile}`
@@ -2406,6 +2409,7 @@ async function selectProfile(name) {
   pendingChallenges = [];
   pendingChallengeIndex = 0;
   updateChallengeBadge();
+  if (incomingChannel) { sb.removeChannel(incomingChannel); incomingChannel = null; }
   flipped = false;
   render();
   if (cards.length === 0) setStatus('');
