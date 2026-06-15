@@ -72,6 +72,35 @@
     flex-shrink: 0;
   }
 
+  .mode-toggle-btn {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    height: 36px;
+    padding: 0 10px;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--ink-soft);
+    letter-spacing: 0.05em;
+    transition: all 0.15s;
+  }
+
+  .mode-toggle-btn:hover {
+    border-color: var(--accent);
+    color: var(--ink);
+  }
+
+  .mode-toggle-btn.fun {
+    background: var(--accent);
+    color: var(--btn-text);
+    border-color: var(--accent);
+  }
+
   #themeToggle {
     background: var(--card);
     border: 1px solid var(--border);
@@ -1013,6 +1042,11 @@
     border-color: var(--accent);
   }
 
+  /* Basic mode hides fun-only elements */
+  body.basic-mode .fun-only {
+    display: none !important;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .flip-inner { transition: none; }
   }
@@ -1040,6 +1074,9 @@
       <p class="subtitle"><span id="profileLabel"></span> &middot; <a href="#" id="switchProfileLink">switch</a></p>
     </div>
     <div class="header-actions">
+      <button id="modeToggle" class="mode-toggle-btn" title="Switch mode" aria-label="Switch between Basic and Fun mode">
+        <span id="modeToggleLabel">Basic</span>
+      </button>
       <button id="themeToggle" aria-label="Toggle dark mode" title="Toggle dark mode">
         <div class="inner-box"></div>
       </button>
@@ -1047,14 +1084,14 @@
   </header>
 
   <!-- Word of the day -->
-  <div id="wordOfDay" class="word-of-day hidden">
+  <div id="wordOfDay" class="word-of-day hidden fun-only">
     <span class="wod-label">Word of the day</span>
     <span id="wodFront" class="wod-word"></span>
     <span id="wodBack" class="wod-back"></span>
   </div>
 
   <!-- Mode toggles -->
-  <div class="mode-toggles">
+  <div class="mode-toggles fun-only">
     <button id="reverseModeBtn" class="mode-btn" title="Reverse mode: English → German">⇄ Reverse</button>
     <button id="typeModeBtn" class="mode-btn" title="Typing mode">⌨ Type</button>
     <button id="masteredBtn" class="mode-btn" title="Practice mastered cards">⭐ Mastered</button>
@@ -1074,7 +1111,7 @@
   </div>
 
   <!-- Typing mode input -->
-  <div id="typeInputRow" class="hidden" style="display:none;">
+  <div id="typeInputRow" class="hidden fun-only" style="display:none;">
     <form id="typeForm" style="display:flex;gap:8px;margin-bottom:0.75rem;">
       <input id="typeInput" autocomplete="off" placeholder="Type the answer…" style="flex:1;font-family:'Inter',sans-serif;font-size:0.9rem;padding:0.6rem 0.75rem;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--ink);" />
       <button type="submit" style="font-family:'JetBrains Mono',monospace;font-size:0.85rem;font-weight:700;background:var(--accent);color:var(--btn-text);border:none;border-radius:8px;padding:0 1rem;cursor:pointer;">Check</button>
@@ -1083,7 +1120,7 @@
   </div>
 
   <!-- 3. Secondary actions row -->
-  <div class="toolbar" style="margin-bottom:0.75rem;">
+  <div class="toolbar fun-only" style="margin-bottom:0.75rem;">
     <button id="shuffleBtn" title="Shuffle deck order">
       <i class="ti ti-arrows-shuffle" aria-hidden="true"></i> Shuffle
     </button>
@@ -1102,20 +1139,20 @@
     </div>
   </div>
 
-  <!-- 5. Add a card -->
+  <!-- 5. Add a card (Basic: simple, Fun: with example/notes) -->
   <form class="add-form" id="addForm">
     <input id="frontInput" placeholder="German word" autocomplete="off" required />
     <input id="backInput" placeholder="English meaning" autocomplete="off" required />
     <button type="submit" id="addBtn">Add</button>
   </form>
-  <input id="exampleInput" class="example-input" placeholder="Example sentence (optional)" autocomplete="off" />
-  <input id="notesInput" class="example-input" placeholder="Notes (e.g. die, plural: Häuser)" autocomplete="off" />
+  <input id="exampleInput" class="example-input fun-only" placeholder="Example sentence (optional)" autocomplete="off" />
+  <input id="notesInput" class="example-input fun-only" placeholder="Notes (e.g. die, plural: Häuser)" autocomplete="off" />
   <p class="status-line" id="statusLine"></p>
 
-  <hr style="border:none;border-top:1px solid var(--border);margin:0.5rem 0 0.75rem;">
+  <hr class="fun-only" style="border:none;border-top:1px solid var(--border);margin:0.5rem 0 0.75rem;">
 
   <!-- 6. Stats -->
-  <div class="stats" style="grid-template-columns:repeat(4,1fr);">
+  <div class="stats fun-only" style="grid-template-columns:repeat(4,1fr);">
     <div class="stat due">
       <p class="stat-label">Practiced</p>
       <p class="stat-value" id="dueCount">0</p>
@@ -1135,19 +1172,19 @@
   </div>
 
   <!-- 6. Your deck (collapsed) -->
-  <button class="section-toggle" id="deckToggle" type="button">
+  <button class="section-toggle fun-only" id="deckToggle" type="button">
     <i class="ti ti-chevron-down" aria-hidden="true"></i> Your deck
   </button>
-  <div class="deck-section hidden" id="deckSection">
+  <div class="deck-section hidden fun-only" id="deckSection">
     <input id="deckSearch" class="example-input" placeholder="Search German or English..." autocomplete="off" />
     <div class="deck-list" id="deckList"></div>
   </div>
 
   <!-- 7. Activity (collapsed) -->
-  <button class="section-toggle" id="chartToggle" type="button">
+  <button class="section-toggle fun-only" id="chartToggle" type="button">
     <i class="ti ti-chevron-down" aria-hidden="true"></i> Activity
   </button>
-  <div class="deck-section hidden" id="chartSection">
+  <div class="deck-section hidden fun-only" id="chartSection">
     <div class="heatmap-wrap">
       <div class="heatmap-months" id="heatmapMonths"></div>
       <div class="heatmap-grid" id="heatmapGrid"></div>
@@ -1678,27 +1715,39 @@ function renderCardZone() {
   }
 
   document.getElementById('flipCard').addEventListener('click', () => {
-    if (typeMode) return; // typing mode handles its own flow
+    if (typeMode) return;
     flipped = !flipped;
-    render();
+    document.getElementById('flipCard').classList.toggle('flipped', flipped);
+    if (flipped) {
+      gradeRow.classList.remove('hidden');
+      gradeRow.querySelectorAll('button').forEach(b => {
+        b.onclick = (e) => {
+          e.stopPropagation();
+          grade(currentCard, parseInt(b.dataset.q, 10));
+        };
+      });
+    } else {
+      gradeRow.classList.add('hidden');
+    }
   });
 
   if (typeMode) {
     gradeRow.classList.add('hidden');
     showTypeInput(true);
     setTimeout(() => document.getElementById('typeInput').focus(), 100);
-  } else if (flipped) {
-    showTypeInput(false);
-    gradeRow.classList.remove('hidden');
-    gradeRow.querySelectorAll('button').forEach(b => {
-      b.onclick = (e) => {
-        e.stopPropagation();
-        grade(currentCard, parseInt(b.dataset.q, 10));
-      };
-    });
   } else {
     showTypeInput(false);
-    gradeRow.classList.add('hidden');
+    if (flipped) {
+      gradeRow.classList.remove('hidden');
+      gradeRow.querySelectorAll('button').forEach(b => {
+        b.onclick = (e) => {
+          e.stopPropagation();
+          grade(currentCard, parseInt(b.dataset.q, 10));
+        };
+      });
+    } else {
+      gradeRow.classList.add('hidden');
+    }
   }
 }
 
@@ -2322,6 +2371,46 @@ document.getElementById('themeToggle').addEventListener('click', () => {
 
 initTheme();
 
+// ── Basic / Fun mode toggle ───────────────────────────────
+let funMode = false;
+
+function applyMode(fun) {
+  funMode = fun;
+  const btn = document.getElementById('modeToggle');
+  const label = document.getElementById('modeToggleLabel');
+  if (fun) {
+    document.body.classList.remove('basic-mode');
+    btn.classList.add('fun');
+    label.textContent = 'Fun';
+  } else {
+    document.body.classList.add('basic-mode');
+    btn.classList.remove('fun');
+    label.textContent = 'Basic';
+    // Reset fun-only states
+    reverseMode = false;
+    typeMode = false;
+    masteredMode = false;
+    document.getElementById('reverseModeBtn').classList.remove('active');
+    document.getElementById('typeModeBtn').classList.remove('active');
+    document.getElementById('masteredBtn').classList.remove('active');
+    showTypeInput(false);
+  }
+  try { localStorage.setItem('vokabelkarten-mode', fun ? 'fun' : 'basic'); } catch (e) {}
+  render();
+}
+
+function initMode() {
+  let saved = 'basic';
+  try { saved = localStorage.getItem('vokabelkarten-mode') || 'basic'; } catch (e) {}
+  applyMode(saved === 'fun');
+}
+
+document.getElementById('modeToggle').addEventListener('click', () => {
+  applyMode(!funMode);
+});
+
+initMode();
+
 // Section toggles
 function setupSectionToggle(toggleId, sectionId, onOpen) {
   const toggle = document.getElementById(toggleId);
@@ -2508,7 +2597,7 @@ document.getElementById('editProfileOverlay').addEventListener('click', (e) => {
   if (e.target.id === 'editProfileOverlay') closeEditProfileModal();
 });
 
-const EMOJI_OPTIONS = ['🦊','🐻','🐱','🐶','🦉','🐢','🐸','🦁','🐼','🐧','🦄','🐝'];
+const EMOJI_OPTIONS = ['🍀','👩‍💻','🐶','🐧','🐻','🐝','🦕','🐳','🦢','🪴','🪐','🎆','🌄','🌃'];
 const THEME_COLORS = ['#3A5A78','#B5564A','#C99A3B','#5B8BAE','#9C6ADE','#E07A5F','#4A9D8A','#D4518A'];
 
 let selectedEmoji = EMOJI_OPTIONS[0];
