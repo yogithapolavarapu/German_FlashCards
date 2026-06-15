@@ -767,7 +767,14 @@
     margin-bottom: 1rem;
   }
 
-  .profile-list button {
+  .profile-list-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .profile-pick-btn {
+    flex: 1;
     font-family: 'Inter', sans-serif;
     font-size: 0.9rem;
     font-weight: 500;
@@ -780,9 +787,27 @@
     cursor: pointer;
   }
 
-  .profile-list button:hover {
+  .profile-pick-btn:hover {
     border-color: var(--accent);
     background: var(--accent-soft);
+  }
+
+  .profile-edit-icon {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.6rem;
+    cursor: pointer;
+    color: var(--ink-soft);
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  .profile-edit-icon:hover {
+    border-color: var(--accent);
+    color: var(--ink);
   }
 
   .profile-list button .avatar-chip {
@@ -937,6 +962,20 @@
     <div class="avatar-picker" id="emojiPicker"></div>
     <div class="modal-actions">
       <button id="profileGoBtn" type="button" class="primary">Continue</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="editProfileOverlay">
+  <div class="modal">
+    <p class="modal-title">Edit profile</p>
+    <label class="modal-label" for="editProfileName">Name</label>
+    <input id="editProfileName" autocomplete="off" />
+    <label class="modal-label">Avatar</label>
+    <div class="avatar-picker" id="editEmojiPicker"></div>
+    <div class="modal-actions">
+      <button id="editProfileCancelBtn" type="button">Cancel</button>
+      <button id="editProfileSaveBtn" type="button" class="primary">Save</button>
     </div>
   </div>
 </div>
@@ -1556,6 +1595,74 @@ document.getElementById('editOverlay').addEventListener('click', (e) => {
   if (e.target.id === 'editOverlay') closeEditModal();
 });
 
+// Edit profile
+let editingProfileName = null;
+let editingProfileEmoji = null;
+
+function renderEditEmojiPicker() {
+  const el = document.getElementById('editEmojiPicker');
+  el.innerHTML = EMOJI_OPTIONS.map(e =>
+    `<button type="button" data-emoji="${e}" class="${e === editingProfileEmoji ? 'selected' : ''}">${e}</button>`
+  ).join('');
+  el.querySelectorAll('button').forEach(b => {
+    b.addEventListener('click', () => {
+      editingProfileEmoji = b.dataset.emoji;
+      renderEditEmojiPicker();
+    });
+  });
+}
+
+function openEditProfileModal(name, emoji) {
+  editingProfileName = name;
+  editingProfileEmoji = emoji || EMOJI_OPTIONS[0];
+  document.getElementById('editProfileName').value = name;
+  renderEditEmojiPicker();
+  document.getElementById('editProfileOverlay').classList.remove('hidden');
+}
+
+function closeEditProfileModal() {
+  editingProfileName = null;
+  document.getElementById('editProfileOverlay').classList.add('hidden');
+}
+
+async function saveEditedProfile() {
+  const newName = document.getElementById('editProfileName').value.trim();
+  if (!newName || !editingProfileName) return;
+  const oldName = editingProfileName;
+  const newEmoji = editingProfileEmoji;
+
+  // Update all cards with old profile name
+  if (newName !== oldName) {
+    const { error: cardErr } = await sb.from('cards').update({ profile: newName }).eq('profile', oldName);
+    if (cardErr) { setStatus('Could not rename: ' + cardErr.message, true); return; }
+    const { error: actErr } = await sb.from('activity').update({ profile: newName }).eq('profile', oldName);
+    if (actErr) { setStatus('Could not rename activity: ' + actErr.message, true); return; }
+  }
+
+  // Upsert streak with new name and emoji
+  await sb.from('streaks').delete().eq('profile', oldName);
+  await sb.from('streaks').upsert({ profile: newName, avatar_emoji: newEmoji });
+
+  // If this is the current profile, update local state
+  if (profile === oldName) {
+    profile = newName;
+    currentAvatar = { emoji: newEmoji };
+    try { localStorage.setItem('vokabelkarten-profile', profile); } catch (e) {}
+    document.getElementById('profileLabel').innerHTML = avatarChip(newEmoji) + escapeHtml(profile);
+  }
+
+  closeEditProfileModal();
+  setStatus('Profile updated.');
+  // Refresh picker list
+  showProfilePicker();
+}
+
+document.getElementById('editProfileCancelBtn').addEventListener('click', closeEditProfileModal);
+document.getElementById('editProfileSaveBtn').addEventListener('click', saveEditedProfile);
+document.getElementById('editProfileOverlay').addEventListener('click', (e) => {
+  if (e.target.id === 'editProfileOverlay') closeEditProfileModal();
+});
+
 const EMOJI_OPTIONS = ['🦊','🐻','🐱','🐶','🦉','🐢','🐸','🦁','🐼','🐧','🦄','🐝'];
 
 let selectedEmoji = EMOJI_OPTIONS[0];
@@ -1598,10 +1705,19 @@ async function showProfilePicker() {
     list.innerHTML = '<p style="font-size:0.85rem; color: var(--ink-soft); margin:0;">No profiles yet — add the first name below.</p>';
   } else {
     list.innerHTML = known.map(p =>
-      `<button data-profile="${escapeHtml(p.name)}">${avatarChip(p.emoji)}${escapeHtml(p.name)}</button>`
+      `<div class="profile-list-row">
+        <button class="profile-pick-btn" data-profile="${escapeHtml(p.name)}">${avatarChip(p.emoji)}${escapeHtml(p.name)}</button>
+        <button class="profile-edit-icon" data-profile="${escapeHtml(p.name)}" data-emoji="${escapeHtml(p.emoji || '')}" aria-label="Edit profile" title="Edit"><i class="ti ti-pencil"></i></button>
+      </div>`
     ).join('');
-    list.querySelectorAll('button').forEach(b => {
+    list.querySelectorAll('.profile-pick-btn').forEach(b => {
       b.addEventListener('click', () => selectProfile(b.dataset.profile));
+    });
+    list.querySelectorAll('.profile-edit-icon').forEach(b => {
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openEditProfileModal(b.dataset.profile, b.dataset.emoji);
+      });
     });
   }
   renderAvatarPickers();
