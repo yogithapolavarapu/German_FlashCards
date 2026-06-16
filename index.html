@@ -2337,15 +2337,12 @@ function subscribeIncomingChallenges() {
       event: 'INSERT', schema: 'public', table: 'challenges',
       filter: `invited=eq.${profile}`
     }, async payload => {
-      console.log('[challenge] realtime INSERT received', payload);
       const { data } = await sb.from('challenges').select('*').eq('id', payload.new.id).single();
       if (data && data.status === 'pending') {
         await addPendingChallenge(data);
       }
     })
-    .subscribe((status) => {
-      console.log('[challenge] subscription status for', profile, ':', status);
-    });
+    .subscribe();
 }
 
 async function showOpponentChallenge(challenge) {
