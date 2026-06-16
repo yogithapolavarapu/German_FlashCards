@@ -1082,6 +1082,10 @@
     display: none !important;
   }
 
+  body.no-grading-profile .grading-only {
+    display: none !important;
+  }
+
   body:not(.basic-mode) #basicDeckPicker {
     display: none !important;
   }
@@ -1164,8 +1168,8 @@
   <!-- Mode toggles -->
   <div class="mode-toggles fun-only">
     <button id="reverseModeBtn" class="mode-btn" title="Reverse mode: English → German">⇄ Reverse</button>
-    <button id="typeModeBtn" class="mode-btn" title="Typing mode">⌨ Type</button>
-    <button id="masteredBtn" class="mode-btn" title="Practice mastered cards">⭐ Mastered</button>
+    <button id="typeModeBtn" class="mode-btn grading-only" title="Typing mode">⌨ Type</button>
+    <button id="masteredBtn" class="mode-btn grading-only" title="Practice mastered cards">⭐ Mastered</button>
     <button id="historyBtn" class="mode-btn" title="Challenge history">📋 History</button>
   </div>
 
@@ -1195,14 +1199,14 @@
     <button id="shuffleBtn" title="Shuffle deck order">
       <i class="ti ti-arrows-shuffle" aria-hidden="true"></i> Shuffle
     </button>
-    <button id="quizBtn" title="Quiz mode">
+    <button id="quizBtn" class="grading-only" title="Quiz mode">
       <i class="ti ti-help" aria-hidden="true"></i> Quiz
     </button>
-    <button id="challengeBtn" title="Challenge a friend" style="position:relative;">
+    <button id="challengeBtn" class="grading-only" title="Challenge a friend" style="position:relative;">
       <i class="ti ti-bolt" aria-hidden="true"></i> Challenge
       <span id="challengeBadge" style="display:none;position:absolute;top:-6px;right:-6px;background:var(--red);color:#fff;font-size:10px;font-weight:700;border-radius:999px;min-width:16px;height:16px;line-height:16px;text-align:center;padding:0 3px;"></span>
     </button>
-    <div class="toolbar-group">
+    <div class="toolbar-group grading-only">
       <span class="toolbar-label">Send to deck:</span>
       <button data-send="1">Hard</button>
       <button data-send="2">Moderate</button>
@@ -1242,7 +1246,7 @@
       <p class="stat-label">Streak</p>
       <p class="stat-value" id="streakCount">0</p>
     </div>
-    <div class="stat">
+    <div class="stat grading-only">
       <p class="stat-label">Mastered</p>
       <p class="stat-value" id="masteredCount">0</p>
     </div>
@@ -1677,8 +1681,8 @@ function renderCardZone() {
     if (!currentCard || !currentCard.mastered) {
       currentCard = mastered[Math.floor(Math.random() * mastered.length)];
     }
-  } else if (!funMode) {
-    // Basic mode: random from allCards
+  } else if (!funMode || isFunPhraseProfile()) {
+    // Basic mode or fun-phrase profile: random pick, no spaced repetition
     if (!currentCard) currentCard = cardPool[Math.floor(Math.random() * cardPool.length)];
   } else {
     if (!currentCard) currentCard = pickCard();
@@ -1801,8 +1805,13 @@ function renderCardZone() {
 
   document.getElementById('flipCard').addEventListener('click', () => {
     if (typeMode) return;
-    if (!funMode && flipped) {
-      // Basic mode: second tap = next card
+    const noGrading = !funMode || isFunPhraseProfile();
+    if (noGrading && flipped) {
+      // Basic mode or fun-phrase profile: second tap = next card
+      if (isFunPhraseProfile()) {
+        recordPracticeToday();
+        recordActivity();
+      }
       flipped = false;
       currentCard = null;
       render();
@@ -1810,7 +1819,7 @@ function renderCardZone() {
     }
     flipped = !flipped;
     document.getElementById('flipCard').classList.toggle('flipped', flipped);
-    if (flipped && funMode) {
+    if (flipped && funMode && !isFunPhraseProfile()) {
       gradeRow.classList.remove('hidden');
       gradeRow.querySelectorAll('button').forEach(b => {
         b.onclick = (e) => {
@@ -1823,13 +1832,13 @@ function renderCardZone() {
     }
   });
 
-  if (typeMode && funMode) {
+  if (typeMode && funMode && !isFunPhraseProfile()) {
     gradeRow.classList.add('hidden');
     showTypeInput(true);
     setTimeout(() => document.getElementById('typeInput').focus(), 100);
   } else {
     showTypeInput(false);
-    if (flipped && funMode) {
+    if (flipped && funMode && !isFunPhraseProfile()) {
       gradeRow.classList.remove('hidden');
       gradeRow.querySelectorAll('button').forEach(b => {
         b.onclick = (e) => {
@@ -2480,6 +2489,10 @@ initTheme();
 
 // ── Basic / Fun mode toggle ───────────────────────────────
 let funMode = false;
+const FUN_PHRASE_PROFILE = 'DinosRawwwrrrr';
+function isFunPhraseProfile() {
+  return profile === FUN_PHRASE_PROFILE;
+}
 let basicUseAllCards = false;
 
 document.getElementById('basicMyDeckBtn').addEventListener('click', () => {
@@ -2845,6 +2858,10 @@ async function selectProfile(name) {
   typeMode = false;
   document.getElementById('reverseModeBtn').classList.remove('active');
   document.getElementById('typeModeBtn').classList.remove('active');
+  document.body.classList.toggle('no-grading-profile', isFunPhraseProfile());
+  if (isFunPhraseProfile()) {
+    await applyMode(true);
+  }
   render();
   fetchWordOfDay();
   if (cards.length === 0) setStatus('');
