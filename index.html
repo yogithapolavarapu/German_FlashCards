@@ -529,11 +529,32 @@
   }
 
   footer {
-    margin-top: 2.5rem;
+    margin-top: 0.75rem;
     text-align: center;
     font-size: 0.75rem;
     color: var(--ink-soft);
   }
+
+  .ios-install-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    margin-top: 2rem;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 600;
+    background: var(--accent);
+    color: var(--btn-text);
+    border: none;
+    border-radius: 10px;
+    padding: 0.7rem;
+    cursor: pointer;
+  }
+
+  .ios-install-btn:hover { background: var(--btn-hover); }
+  .ios-install-btn.hidden { display: none; }
 
   .word-of-day {
     display: flex;
@@ -1255,7 +1276,10 @@
     </div>
   </div>
 
-  <footer>Saved to your Supabase database.</footer>
+  <button id="iosInstallBtn" class="ios-install-btn hidden">
+    <i class="ti ti-download" aria-hidden="true"></i> Add to Home Screen
+  </button>
+  <footer>Made with ☕ and ❤️ — Yogitha</footer>
 </main>
 
 <div class="modal-overlay hidden" id="profileOverlay">
@@ -3022,6 +3046,20 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('service-worker.js').catch(() => {});
   });
 }
+
+// ── iOS install prompt ────────────────────────────────────
+(function() {
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  const isStandalone = window.navigator.standalone === true ||
+    window.matchMedia('(display-mode: standalone)').matches;
+  if (isIOS && !isStandalone) {
+    const btn = document.getElementById('iosInstallBtn');
+    btn.classList.remove('hidden');
+    btn.addEventListener('click', () => {
+      alert('To install: tap the Share button (square with an arrow) in Safari\'s toolbar, then choose "Add to Home Screen."');
+    });
+  }
+})();
 </script>
 </body>
 </html>
