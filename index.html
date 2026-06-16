@@ -2017,7 +2017,7 @@ async function startQuizSizePicker() {
   const combinedOptions = hasCombined
     ? [10, 25, uniqueAll.length]
         .filter((v, i, a) => a.indexOf(v) === i && v <= uniqueAll.length)
-        .map(s => `<button class="quiz-option" data-size="${s}" data-pool="all" style="border-color:var(--gold);">${s === uniqueAll.length ? `Everyone's deck (${s} unique)` : `${s} from everyone's deck`}</button>`)
+        .map(s => `<button class="quiz-option" data-size="${s}" data-pool="all" style="border-color:var(--gold);">${s === uniqueAll.length ? `Everyone's deck (${s})` : `${s} from everyone's deck`}</button>`)
     : [];
 
   sizeOptions.innerHTML = [...myOptions, ...combinedOptions].join('');
