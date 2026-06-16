@@ -1998,6 +1998,7 @@ async function fetchAllCards() {
 async function startQuizSizePicker() {
   if (cards.length < 4) { setStatus('Need at least 4 cards to quiz.'); return; }
   await fetchAllCards();
+  await fetchTypoBank();
   const seenAll = new Set();
   const uniqueAll = allCards.filter(c => {
     const key = c.front.trim().toLowerCase() + '|' + c.back.trim().toLowerCase();
@@ -2017,7 +2018,7 @@ async function startQuizSizePicker() {
   const combinedOptions = hasCombined
     ? [10, 25, uniqueAll.length]
         .filter((v, i, a) => a.indexOf(v) === i && v <= uniqueAll.length)
-        .map(s => `<button class="quiz-option" data-size="${s}" data-pool="all" style="border-color:var(--gold);">${s === uniqueAll.length ? `Everyone's deck (${s})` : `${s} from everyone's deck`}</button>`)
+        .map(s => `<button class="quiz-option" data-size="${s}" data-pool="all" style="border-color:var(--gold);">${s === uniqueAll.length ? `Everyone's deck (${s} unique)` : `${s} from everyone's deck`}</button>`)
     : [];
 
   sizeOptions.innerHTML = [...myOptions, ...combinedOptions].join('');
@@ -2336,12 +2337,15 @@ function subscribeIncomingChallenges() {
       event: 'INSERT', schema: 'public', table: 'challenges',
       filter: `invited=eq.${profile}`
     }, async payload => {
+      console.log('[challenge] realtime INSERT received', payload);
       const { data } = await sb.from('challenges').select('*').eq('id', payload.new.id).single();
       if (data && data.status === 'pending') {
         await addPendingChallenge(data);
       }
     })
-    .subscribe();
+    .subscribe((status) => {
+      console.log('[challenge] subscription status for', profile, ':', status);
+    });
 }
 
 async function showOpponentChallenge(challenge) {
@@ -2922,10 +2926,11 @@ function showTypeInput(show) {
   }
 }
 
-document.getElementById('typeForm').addEventListener('submit', (e) => {
+document.getElementById('typeForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   if (!currentCard || typingAnswered) return;
-  const typed = document.getElementById('typeInput').value.trim().toLowerCase();
+  const typedRaw = document.getElementById('typeInput').value.trim();
+  const typed = typedRaw.toLowerCase();
   const expected = (reverseMode ? currentCard.front : currentCard.back).toLowerCase();
   const correct = typed === expected;
   const result = document.getElementById('typeResult');
@@ -2933,13 +2938,24 @@ document.getElementById('typeForm').addEventListener('submit', (e) => {
   result.style.color = correct ? 'var(--gold)' : 'var(--red)';
   result.classList.remove('hidden');
   typingAnswered = true;
-  if (correct) launchConfetti(1500);
+  if (correct) {
+    launchConfetti(1500);
+  } else if (typedRaw.length > 0) {
+    // Save the wrong answer to the typo bank to use as a future funny quiz option
+    saveTypo(typedRaw);
+  }
   // auto-grade after typing
   setTimeout(() => {
     grade(currentCard, correct ? 3 : 1);
     showTypeInput(true);
   }, 1200);
 });
+
+async function saveTypo(text) {
+  try {
+    await sb.from('typo_bank').insert({ text });
+  } catch (e) {}
+}
 
 // ── Mastered cards ────────────────────────────────────────
 let masteredMode = false;
@@ -3027,20 +3043,21 @@ document.getElementById('historyCloseBtn').addEventListener('click', () => {
   document.getElementById('historyOverlay').classList.add('hidden');
 });
 
-// ── Funny wrong answers ───────────────────────────────────
-const FUNNY_ANSWERS = [
-  'Potato', 'Definitely not this', 'Ich weiß nicht', 'Das Auto',
-  'Nein!', 'Jawohl', 'Wurst', 'Bratwurst', 'Lederhosen', 'Oktoberfest',
-  'Something German', 'A very long word', 'Sprechen Sie Deutsch?', 'Ja ja ja'
-];
+// ── Funny wrong answers (sourced from real typos people made) ───────
+let typoBank = [];
+
+async function fetchTypoBank() {
+  const { data } = await sb.from('typo_bank').select('text').order('created_at', { ascending: false }).limit(200);
+  typoBank = (data || []).map(r => r.text);
+}
 
 function getQuizOptions(correctAnswer, pool, count = 4) {
   const wrongs = pool.filter(c => c.back !== correctAnswer);
   const options = [correctAnswer];
-  // 1 in 5 chance of a funny answer
-  if (Math.random() < 0.2 && count === 4) {
-    const funny = FUNNY_ANSWERS[Math.floor(Math.random() * FUNNY_ANSWERS.length)];
-    if (!options.includes(funny)) options.push(funny);
+  // 1 in 5 chance of a funny answer pulled from real past typos
+  if (Math.random() < 0.2 && count === 4 && typoBank.length > 0) {
+    const funny = typoBank[Math.floor(Math.random() * typoBank.length)];
+    if (funny && !options.includes(funny)) options.push(funny);
   }
   const shuffledWrongs = [...wrongs].sort(() => Math.random() - 0.5);
   for (const w of shuffledWrongs) {
