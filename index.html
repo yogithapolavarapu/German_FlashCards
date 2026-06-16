@@ -2295,6 +2295,8 @@ let pendingChallenges = [];
 let pendingChallengeIndex = 0;
 
 function updateChallengeBadge() {
+  // Defensive filter: never show challenges that aren't actually for this profile
+  pendingChallenges = pendingChallenges.filter(c => c.invited === profile);
   const badge = document.getElementById('challengeBadge');
   if (pendingChallenges.length > 0) {
     badge.textContent = pendingChallenges.length;
@@ -2305,6 +2307,8 @@ function updateChallengeBadge() {
 }
 
 async function addPendingChallenge(data) {
+  // Safety check: only accept challenges actually invited to the current profile
+  if (data.invited !== profile) return;
   if (data.card_id) {
     const { data: cardData } = await sb.from('cards').select('*').eq('id', data.card_id).single();
     data.cards = cardData;
@@ -3060,9 +3064,34 @@ function getQuizOptions(correctAnswer, pool, count = 4) {
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('service-worker.js').catch(() => {});
+    navigator.serviceWorker.register('service-worker.js').then((reg) => {
+      // Check for a new version whenever the app becomes visible again
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          reg.update().catch(() => {});
+        }
+      });
+    }).catch(() => {});
+
+    // If a new service worker takes over, reload to get the latest files
+    let refreshed = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (refreshed) return;
+      refreshed = true;
+      window.location.reload();
+    });
   });
 }
+
+// Re-check pending challenges and reconnect Realtime whenever the app
+// comes back to the foreground (mobile often suspends the WebSocket
+// connection in the background, so it needs to be re-established).
+document.addEventListener('visibilitychange', () => {
+  const pickerOpen = !document.getElementById('profileOverlay').classList.contains('hidden');
+  if (document.visibilityState === 'visible' && profile && !pickerOpen) {
+    checkPendingChallenge();
+  }
+});
 
 // ── iOS install prompt ────────────────────────────────────
 (function() {
