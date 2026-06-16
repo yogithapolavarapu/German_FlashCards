@@ -4,6 +4,17 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>German Flashcards</title>
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#3A5A78">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Vokabelkarten">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -1973,7 +1984,7 @@ async function startQuizSizePicker() {
   const combinedOptions = hasCombined
     ? [10, 25, uniqueAll.length]
         .filter((v, i, a) => a.indexOf(v) === i && v <= uniqueAll.length)
-        .map(s => `<button class="quiz-option" data-size="${s}" data-pool="all" style="border-color:var(--gold);">${s === uniqueAll.length ? `Everyone's deck (${s})` : `${s} from everyone's deck`}</button>`)
+        .map(s => `<button class="quiz-option" data-size="${s}" data-pool="all" style="border-color:var(--gold);">${s === uniqueAll.length ? `Everyone's deck (${s} unique)` : `${s} from everyone's deck`}</button>`)
     : [];
 
   sizeOptions.innerHTML = [...myOptions, ...combinedOptions].join('');
@@ -3005,6 +3016,12 @@ function getQuizOptions(correctAnswer, pool, count = 4) {
     await showProfilePicker();
   }
 })();
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js').catch(() => {});
+  });
+}
 </script>
 </body>
 </html>
